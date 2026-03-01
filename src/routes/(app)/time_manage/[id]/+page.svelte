@@ -44,6 +44,7 @@
 	let cd_id = '';
 	let is_requested = false;
 	let players = writable(['']);
+	let duplicateWarning = null;
 
 	function addPlayer() {
 		players.update((currentPlayers) => [...currentPlayers, '']);
@@ -247,19 +248,14 @@
 
 	onMount(() => {
 		fetchUsers();
+		loadTimeInfo(id);
 	});
 
 	$: if (id) {
 		reloadAll(id);
 	}
 
-	async function handleSubmit(event) {
-		event.preventDefault();
-		const isValid = $players.every((player) => player !== '' && !player.includes(':'));
-		if (isValid) {
-			alert("'{악기/역할} : {연주자 이름}' 형식으로 적어주세요");
-			return;
-		}
+	async function submitMusic() {
 		const formData = {
 			time: id,
 			order: timeMusic.length > 0 ? timeMusic[timeMusic.length - 1].order + 1 : 1,
@@ -291,10 +287,31 @@
 			cd_id = '';
 			is_requested = false;
 			players.set(['']);
+			duplicateWarning = null;
 			loadTimeInfo(id);
 		} else {
 			console.error('Failed to create');
 		}
+	}
+
+	async function handleSubmit(event) {
+		event.preventDefault();
+		const isValid = $players.every((player) => player !== '' && !player.includes(':'));
+		if (isValid) {
+			alert("'{악기/역할} : {연주자 이름}' 형식으로 적어주세요");
+			return;
+		}
+
+		const params = new URLSearchParams({ composer_name: composer, title, days: 7 });
+		const checkRes = await fetch(`/api/check-duplicate?${params}`);
+		const checkData = await checkRes.json();
+
+		if (checkData.duplicates.length > 0) {
+			duplicateWarning = checkData.duplicates;
+			return;
+		}
+
+		await submitMusic();
 	}
 
 	async function handleEdit(event) {
@@ -544,6 +561,22 @@
 					<img src={plusicon} alt="plus" />
 				</button>
 				<input id="submit1" type="submit" value="곡 추가하기" class="submit" />
+			{#if duplicateWarning}
+				<div class="duplicate-warning">
+					<div class="warning-title">⚠ 최근 7일 내 재생된 곡입니다</div>
+					{#each duplicateWarning as d}
+						<div class="warning-item">
+							{d.date} · {d.time}타임 — {d.composer_name} · {d.music_title}
+						</div>
+					{/each}
+					<div class="warning-buttons">
+						<button type="button" class="warn-cancel" on:click={() => (duplicateWarning = null)}
+							>취소</button
+						>
+						<button type="button" class="warn-confirm" on:click={submitMusic}>그래도 추가</button>
+					</div>
+				</div>
+			{/if}
 			</form>
 
 			<div class="comments-section">
@@ -1210,5 +1243,54 @@
 
 	.hide-scrollbar::-webkit-scrollbar {
 		display: none; /* Safari and Chrome */
+	}
+	.duplicate-warning {
+		width: 100%;
+		max-width: 460px;
+		border: 2px solid var(--primary-primary-700);
+		border-radius: 6px;
+		padding: 12px 16px;
+		background-color: var(--secondary-secondary-100);
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+		box-sizing: border-box;
+	}
+	.warning-title {
+		font-family: var(--medium-font-family);
+		font-size: 14px;
+		font-weight: 600;
+		color: var(--primary-primary-700);
+	}
+	.warning-item {
+		font-family: var(--small-medium-font-family);
+		font-size: 13px;
+		color: var(--gray-gray-950);
+	}
+	.warning-buttons {
+		display: flex;
+		gap: 12px;
+		justify-content: center;
+		margin-top: 4px;
+	}
+	.warn-cancel {
+		background-color: var(--secondary-secondary-200);
+		color: var(--gray-gray-950);
+		border: 1px solid var(--gray-gray-400);
+		border-radius: 4px;
+		padding: 4px 16px;
+		cursor: pointer;
+		font-size: 13px;
+		font-family: var(--small-medium-font-family);
+	}
+	.warn-confirm {
+		background-color: var(--primary-primary-700);
+		color: var(--gray-gray-50);
+		border: none;
+		border-radius: 4px;
+		padding: 4px 16px;
+		cursor: pointer;
+		font-size: 13px;
+		font-family: var(--small-medium-font-family);
 	}
 </style>
