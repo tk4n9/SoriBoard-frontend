@@ -9,6 +9,24 @@
 	let userId = null;
 	let includeMentees = false;
 
+	// 기본 기간 = 가장 최근 학기. 3/1 이후 9/1 이전이면 올해 3/1, 그 외에는 가장 가까운 9/1.
+	// (1~2월이면 작년 9/1 부터인 직전 2학기.)
+	function recentSemesterStart(today = new Date()) {
+		const y = today.getFullYear();
+		const mar1 = new Date(y, 2, 1); // 3월
+		const sep1 = new Date(y, 8, 1); // 9월
+		if (today >= mar1 && today < sep1) return `${y}-03-01`;
+		if (today >= sep1) return `${y}-09-01`;
+		return `${y - 1}-09-01`;
+	}
+	function toISODate(d) {
+		const p = (n) => String(n).padStart(2, '0');
+		return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+	}
+
+	let startDate = recentSemesterStart();
+	let endDate = toISODate(new Date());
+
 	let loading = true;
 	let summary = null;
 	let composers = null;
@@ -22,6 +40,8 @@
 	// 현재 필터를 쿼리스트링으로.
 	function buildQuery(extra = {}) {
 		const params = new URLSearchParams();
+		if (startDate) params.set('start', startDate);
+		if (endDate) params.set('end', endDate);
 		if (scope === 'individual' && userId) {
 			params.set('user_id', userId);
 			if (includeMentees) params.set('include_mentees', 'true');
@@ -91,7 +111,10 @@
 
 <div class="stat-page">
 	<header class="page-header">
-		<h1>통계</h1>
+		<div class="title-group">
+			<h1>통계</h1>
+			<span class="period">{startDate} ~ {endDate} (이번 학기)</span>
+		</div>
 		<div class="controls">
 			<ScopeToggle bind:scope on:change={onScopeChange} />
 			{#if scope === 'individual'}
@@ -163,12 +186,22 @@
 		justify-content: space-between;
 		margin-bottom: 20px;
 	}
+	.title-group {
+		display: flex;
+		align-items: baseline;
+		gap: 12px;
+	}
 	h1 {
 		font-family: var(--xlarge-font-family, 'Noto Sans KR', sans-serif);
 		font-size: var(--xlarge-font-size, 32px);
 		font-weight: var(--xlarge-font-weight, 500);
 		color: var(--gray-gray-950, #1a1a1a);
 		margin: 0;
+	}
+	.period {
+		font-family: var(--small-medium-font-family, 'Noto Sans KR', sans-serif);
+		font-size: var(--small-medium-font-size, 13px);
+		color: var(--gray-gray-600, #7c7c7c);
 	}
 	.controls {
 		display: flex;
