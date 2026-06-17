@@ -3,7 +3,13 @@
 	import ChartCard from '$lib/components/stat/ChartCard.svelte';
 	import ScopeToggle from '$lib/components/stat/ScopeToggle.svelte';
 	import MemberSelect from '$lib/components/stat/MemberSelect.svelte';
-	import { horizontalBarOption, timelineOption, eraPieOption } from '$lib/chartOptions.js';
+	import {
+		horizontalBarOption,
+		timelineOption,
+		eraPieOption,
+		countBarOption,
+		diversityLineOption
+	} from '$lib/chartOptions.js';
 
 	let scope = 'all';
 	let userId = null;
@@ -35,7 +41,10 @@
 	let orchestras = null;
 	let timeline = null;
 	let eras = null;
+	let genres = null;
+	let diversity = null;
 	let timelineBucket = 'month';
+	let diversityBucket = 'week'; // 'week' | 'month'
 
 	// 현재 필터를 쿼리스트링으로.
 	function buildQuery(extra = {}) {
@@ -62,15 +71,18 @@
 		if (scope === 'individual' && !userId) return;
 		loading = true;
 		try {
-			[summary, composers, works, conductors, orchestras, timeline, eras] = await Promise.all([
-				getJson('summary'),
-				getJson('composers', { limit: 12 }),
-				getJson('works', { limit: 12 }),
-				getJson('conductors', { limit: 10 }),
-				getJson('orchestras', { limit: 10 }),
-				getJson('timeline', { bucket: timelineBucket }),
-				getJson('eras')
-			]);
+			[summary, composers, works, conductors, orchestras, timeline, eras, genres, diversity] =
+				await Promise.all([
+					getJson('summary'),
+					getJson('composers', { limit: 12 }),
+					getJson('works', { limit: 12 }),
+					getJson('conductors', { limit: 10 }),
+					getJson('orchestras', { limit: 10 }),
+					getJson('timeline', { bucket: timelineBucket }),
+					getJson('eras'),
+					getJson('genres'),
+					getJson('diversity', { bucket: diversityBucket })
+				]);
 		} catch (e) {
 			console.error('통계 로딩 실패', e);
 		} finally {
@@ -89,13 +101,19 @@
 		includeMentees = e.detail.includeMentees;
 		loadAll();
 	}
+	function setDiversityBucket(b) {
+		if (diversityBucket === b) return;
+		diversityBucket = b;
+		loadAll();
+	}
 
 	// 부제: 현재 범위 + 전체 선곡 수.
 	$: scopeLabel = scope === 'individual' ? '개인' : '전체';
 	$: subtitleFor = (envelope) =>
 		envelope ? `${scopeLabel} · 총 ${envelope.total_plays.toLocaleString()}곡` : '';
 
-	$: composerOpt = composers && horizontalBarOption(composers, '많이 튼 작곡가', subtitleFor(composers));
+	$: composerOpt =
+		composers && horizontalBarOption(composers, '많이 튼 작곡가', subtitleFor(composers));
 	$: workOpt = works && horizontalBarOption(works, '많이 튼 곡', subtitleFor(works));
 	$: conductorOpt =
 		conductors && horizontalBarOption(conductors, '많이 튼 지휘자', subtitleFor(conductors));
@@ -107,6 +125,32 @@
 		eras && eras.unknown_share > 0.2
 			? `시대 미상 비율 ${Math.round(eras.unknown_share * 100)}% — 일부 작곡가 데이터 미반영`
 			: '';
+	$: genreOpt = genres && eraPieOption(genres, '장르별 분포', subtitleFor(genres));
+
+	// 다양성: 버킷 라벨, 선곡 수 막대, 다양성(고른정도) 추이.
+	$: bucketLabel = diversityBucket === 'week' ? '주별' : '월별';
+	$: countData = diversity && {
+		labels: diversity.timeline.labels,
+		values: diversity.timeline.plays
+	};
+	$: countOpt = countData && countBarOption(countData, `${bucketLabel} 선곡 수`, scopeLabel);
+	$: diversityOpt =
+		diversity &&
+		diversityLineOption(
+			diversity.timeline.labels,
+			[
+				{ name: '시대 다양성', values: diversity.timeline.era_evenness },
+				{ name: '장르 다양성', values: diversity.timeline.genre_evenness }
+			],
+			`${bucketLabel} 다양성 추이`,
+			'0=편중 · 1=고름 (가능한 모든 구간을 고르게 틀수록 1)'
+		);
+	// 다양성 추이 CSV 용(시대 다양성 한 계열).
+	$: diversityCsvData = diversity && {
+		labels: diversity.timeline.labels,
+		values: diversity.timeline.era_evenness
+	};
+	$: pct = (v) => (v == null ? '—' : `${Math.round(v * 100)}%`);
 </script>
 
 <div class="stat-page">
@@ -158,18 +202,117 @@
 
 		<!-- 차트 그리드 -->
 		<div class="chart-grid">
-			<ChartCard title="많이 튼 작곡가" option={composerOpt} data={composers} {loading}
-				csvHeaders={['작곡가', '횟수']} />
-			<ChartCard title="많이 튼 곡" option={workOpt} data={works} {loading}
-				csvHeaders={['곡', '횟수']} />
-			<ChartCard title="많이 튼 지휘자" option={conductorOpt} data={conductors} {loading}
-				csvHeaders={['지휘자', '횟수']} />
-			<ChartCard title="많이 튼 오케스트라" option={orchestraOpt} data={orchestras} {loading}
-				csvHeaders={['오케스트라', '횟수']} />
-			<ChartCard title="시대별 분포" option={eraOpt} data={eras} {loading} note={eraNote}
-				csvHeaders={['시대', '횟수']} />
-			<ChartCard title="기간별 선곡 추이" option={timelineOpt} data={timeline} {loading}
-				csvHeaders={['기간', '횟수']} />
+			<ChartCard
+				title="많이 튼 작곡가"
+				option={composerOpt}
+				data={composers}
+				{loading}
+				csvHeaders={['작곡가', '횟수']}
+			/>
+			<ChartCard
+				title="많이 튼 곡"
+				option={workOpt}
+				data={works}
+				{loading}
+				csvHeaders={['곡', '횟수']}
+			/>
+			<ChartCard
+				title="많이 튼 지휘자"
+				option={conductorOpt}
+				data={conductors}
+				{loading}
+				csvHeaders={['지휘자', '횟수']}
+			/>
+			<ChartCard
+				title="많이 튼 오케스트라"
+				option={orchestraOpt}
+				data={orchestras}
+				{loading}
+				csvHeaders={['오케스트라', '횟수']}
+			/>
+			<ChartCard
+				title="시대별 분포"
+				option={eraOpt}
+				data={eras}
+				{loading}
+				note={eraNote}
+				csvHeaders={['시대', '횟수']}
+			/>
+			<ChartCard
+				title="장르별 분포"
+				option={genreOpt}
+				data={genres}
+				{loading}
+				csvHeaders={['장르', '횟수']}
+			/>
+			<ChartCard
+				title="기간별 선곡 추이"
+				option={timelineOpt}
+				data={timeline}
+				{loading}
+				csvHeaders={['기간', '횟수']}
+			/>
+		</div>
+
+		<!-- 다양성 섹션 -->
+		<div class="section-head">
+			<h2>선곡 다양성</h2>
+			<div class="bucket-toggle">
+				<button
+					class:active={diversityBucket === 'week'}
+					on:click={() => setDiversityBucket('week')}
+				>
+					주별
+				</button>
+				<button
+					class:active={diversityBucket === 'month'}
+					on:click={() => setDiversityBucket('month')}
+				>
+					월별
+				</button>
+			</div>
+		</div>
+
+		<div class="kpi-row diversity-kpi">
+			<div class="kpi">
+				<div class="kpi-value">{diversity ? pct(diversity.summary.era.evenness) : '—'}</div>
+				<div class="kpi-label">시대 다양성</div>
+			</div>
+			<div class="kpi">
+				<div class="kpi-value">{diversity ? pct(diversity.summary.genre.evenness) : '—'}</div>
+				<div class="kpi-label">장르 다양성</div>
+			</div>
+			<div class="kpi">
+				<div class="kpi-value">{diversity ? diversity.summary.era.simpson.toFixed(2) : '—'}</div>
+				<div class="kpi-label">시대 심슨지수</div>
+			</div>
+			<div class="kpi">
+				<div class="kpi-value">{diversity ? diversity.summary.genre.simpson.toFixed(2) : '—'}</div>
+				<div class="kpi-label">장르 심슨지수</div>
+			</div>
+			<div class="kpi">
+				<div class="kpi-value">
+					{diversity ? diversity.summary.distinct_works.toLocaleString() : '—'}
+				</div>
+				<div class="kpi-label">고유 곡 수</div>
+			</div>
+		</div>
+
+		<div class="chart-grid">
+			<ChartCard
+				title={`${bucketLabel} 선곡 수`}
+				option={countOpt}
+				data={countData}
+				{loading}
+				csvHeaders={['기간', '선곡수']}
+			/>
+			<ChartCard
+				title={`${bucketLabel} 다양성 추이`}
+				option={diversityOpt}
+				data={diversityCsvData}
+				{loading}
+				csvHeaders={['기간', '시대다양성']}
+			/>
 		</div>
 	{/if}
 </div>
@@ -250,5 +393,39 @@
 		display: grid;
 		grid-template-columns: repeat(2, 1fr);
 		gap: 16px;
+	}
+	.section-head {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		margin: 28px 0 12px;
+	}
+	.section-head h2 {
+		font-family: var(--large-font-family, 'Noto Sans KR', sans-serif);
+		font-size: var(--large-font-size, 24px);
+		font-weight: 600;
+		color: var(--gray-gray-950, #1a1a1a);
+		margin: 0;
+	}
+	.bucket-toggle {
+		display: flex;
+		gap: 4px;
+	}
+	.bucket-toggle button {
+		font-family: var(--small-medium-font-family, 'Noto Sans KR', sans-serif);
+		font-size: var(--small-medium-font-size, 13px);
+		color: var(--primary-primary-800, #6a5134);
+		background: var(--secondary-secondary-100, #fef9f3);
+		border: 1px solid var(--primary-primary-600, #c8ad8f);
+		border-radius: 4px;
+		padding: 4px 12px;
+		cursor: pointer;
+	}
+	.bucket-toggle button.active {
+		background: var(--primary-primary-600, #c8ad8f);
+		color: #fff;
+	}
+	.diversity-kpi {
+		grid-template-columns: repeat(5, 1fr);
 	}
 </style>

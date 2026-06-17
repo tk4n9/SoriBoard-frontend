@@ -101,7 +101,64 @@ export function timelineOption({ labels, values }, title, subtitle) {
 	};
 }
 
-// 시대 분포 도넛 (eras)
+// 세로 막대 (주/월별 선곡 수 등 시계열 카운트)
+export function countBarOption({ labels, values }, title, subtitle) {
+	return {
+		title: titleBlock(title, subtitle),
+		textStyle: BASE_TEXT_STYLE,
+		grid: { left: 8, right: 16, top: subtitle ? 70 : 56, bottom: 24, containLabel: true },
+		tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, textStyle: { fontFamily: FONT } },
+		xAxis: {
+			type: 'category',
+			data: labels,
+			axisLabel: { fontFamily: FONT, color: TEXT, hideOverlap: true }
+		},
+		yAxis: { type: 'value', minInterval: 1, axisLabel: { fontFamily: FONT } },
+		series: [
+			{
+				type: 'bar',
+				data: values,
+				itemStyle: { color: ACCENT, borderRadius: [4, 4, 0, 0] }
+			}
+		]
+	};
+}
+
+// 다양성 추이 라인 (0~1 고른정도 여러 계열)
+export function diversityLineOption(labels, series, title, subtitle) {
+	return {
+		title: titleBlock(title, subtitle),
+		textStyle: BASE_TEXT_STYLE,
+		color: CATEGORICAL,
+		grid: { left: 8, right: 16, top: subtitle ? 86 : 72, bottom: 24, containLabel: true },
+		tooltip: { trigger: 'axis', textStyle: { fontFamily: FONT } },
+		legend: { top: subtitle ? 48 : 34, textStyle: { fontFamily: FONT, color: TEXT } },
+		xAxis: {
+			type: 'category',
+			data: labels,
+			boundaryGap: false,
+			axisLabel: { fontFamily: FONT, color: TEXT, hideOverlap: true }
+		},
+		yAxis: {
+			type: 'value',
+			min: 0,
+			max: 1,
+			axisLabel: { fontFamily: FONT, formatter: (v) => v.toFixed(1) }
+		},
+		series: series.map((s) => ({
+			name: s.name,
+			type: 'line',
+			data: s.values,
+			smooth: true,
+			symbol: 'circle',
+			symbolSize: 6,
+			connectNulls: true,
+			lineStyle: { width: 3 }
+		}))
+	};
+}
+
+// 시대 분포 도넛 (eras) — 장르 분포도 같은 형태라 공용으로 쓴다.
 export function eraPieOption({ labels, values }, title, subtitle) {
 	const data = labels.map((name, i) => ({ name, value: values[i] }));
 	return {
