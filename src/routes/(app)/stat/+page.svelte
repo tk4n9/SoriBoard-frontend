@@ -36,7 +36,7 @@
 	let loading = true;
 	let summary = null;
 	let composers = null;
-	let works = null;
+	let soloists = null;
 	let conductors = null;
 	let orchestras = null;
 	let timeline = null;
@@ -71,11 +71,11 @@
 		if (scope === 'individual' && !userId) return;
 		loading = true;
 		try {
-			[summary, composers, works, conductors, orchestras, timeline, eras, genres, diversity] =
+			[summary, composers, soloists, conductors, orchestras, timeline, eras, genres, diversity] =
 				await Promise.all([
 					getJson('summary'),
 					getJson('composers', { limit: 12 }),
-					getJson('works', { limit: 12 }),
+					getJson('soloists', { limit: 12 }),
 					getJson('conductors', { limit: 10 }),
 					getJson('orchestras', { limit: 10 }),
 					getJson('timeline', { bucket: timelineBucket }),
@@ -114,7 +114,8 @@
 
 	$: composerOpt =
 		composers && horizontalBarOption(composers, '많이 튼 작곡가', subtitleFor(composers));
-	$: workOpt = works && horizontalBarOption(works, '많이 튼 곡', subtitleFor(works));
+	$: soloistOpt =
+		soloists && horizontalBarOption(soloists, '많이 튼 독주자', subtitleFor(soloists));
 	$: conductorOpt =
 		conductors && horizontalBarOption(conductors, '많이 튼 지휘자', subtitleFor(conductors));
 	$: orchestraOpt =
@@ -210,11 +211,11 @@
 				csvHeaders={['작곡가', '횟수']}
 			/>
 			<ChartCard
-				title="많이 튼 곡"
-				option={workOpt}
-				data={works}
+				title="많이 튼 독주자"
+				option={soloistOpt}
+				data={soloists}
 				{loading}
-				csvHeaders={['곡', '횟수']}
+				csvHeaders={['연주자', '횟수']}
 			/>
 			<ChartCard
 				title="많이 튼 지휘자"
