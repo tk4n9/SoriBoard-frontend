@@ -44,7 +44,7 @@
 	let genres = null;
 	let diversity = null;
 	let timelineBucket = 'month';
-	let diversityBucket = 'week'; // 'week' | 'month'
+	let diversityBucket = 'month'; // 'week' | 'month'
 
 	// 현재 필터를 쿼리스트링으로.
 	function buildQuery(extra = {}) {
@@ -284,14 +284,6 @@
 				<div class="kpi-label">장르 다양성</div>
 			</div>
 			<div class="kpi">
-				<div class="kpi-value">{diversity ? diversity.summary.era.simpson.toFixed(2) : '—'}</div>
-				<div class="kpi-label">시대 심슨지수</div>
-			</div>
-			<div class="kpi">
-				<div class="kpi-value">{diversity ? diversity.summary.genre.simpson.toFixed(2) : '—'}</div>
-				<div class="kpi-label">장르 심슨지수</div>
-			</div>
-			<div class="kpi">
 				<div class="kpi-value">
 					{diversity ? diversity.summary.distinct_works.toLocaleString() : '—'}
 				</div>
@@ -427,6 +419,6 @@
 		color: #fff;
 	}
 	.diversity-kpi {
-		grid-template-columns: repeat(5, 1fr);
+		grid-template-columns: repeat(3, 1fr);
 	}
 </style>
