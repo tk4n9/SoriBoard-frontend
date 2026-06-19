@@ -33,6 +33,7 @@
 	},
 	"type": "module",
 	"dependencies": {
+		"echarts": "^6.1.0",
 		"ws": "^8.16.0"
 	}
 }
