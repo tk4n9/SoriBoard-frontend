@@ -303,7 +303,7 @@
 			return;
 		}
 
-		const params = new URLSearchParams({ composer_name: composer, title, days: 7 });
+		const params = new URLSearchParams({ time_id: id, composer_name: composer, title, days: 7 });
 		const checkRes = await fetch(`/api/check-duplicate?${params}`);
 		const checkData = await checkRes.json();
 
@@ -539,7 +539,7 @@
 					<Input label="음원 종류" width="100px" bind:value={source}></Input>
 					<Input label="음반 번호" width="100px" bind:value={cd_id}></Input>
 				</div>
-				<MusicHistoryInputs bind:composer bind:title />
+				<MusicHistoryInputs bind:composer bind:title timeId={id} />
 				<Input label="곡 세부 정보(악장 등)" bind:value={detail}></Input>
 				<Input label="오케스트라/실내악단" bind:value={orchestra}></Input>
 				<Input label="지휘자" bind:value={conductor}></Input>
@@ -563,7 +563,7 @@
 				<input id="submit1" type="submit" value="곡 추가하기" class="submit" />
 			{#if duplicateWarning}
 				<div class="duplicate-warning">
-					<div class="warning-title">⚠ 최근 7일 내 재생된 곡입니다</div>
+					<div class="warning-title">⚠ 타임 날짜 기준 최근 7일 내 선곡된 곡입니다</div>
 					{#each duplicateWarning as d}
 						<div class="warning-item">
 							{d.date} · {d.time}타임 — {d.composer_name} · {d.music_title}

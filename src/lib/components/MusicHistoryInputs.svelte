@@ -4,13 +4,15 @@
 
 	export let composer = '';
 	export let title = '';
+	export let timeId;
 
 	let mounted = false;
 	let composing = false;
 	let timer;
 	let controller;
 	let requestId = 0;
-	let previousComposer = '';
+	let previousContext = '';
+	let referenceDate = '';
 	let composers = [];
 	let works = [];
 	let error = '';
@@ -24,22 +26,25 @@
 		requestId += 1;
 	});
 
-	function scheduleLookup(composerName, musicTitle, isComposing) {
+	function scheduleLookup(composerName, musicTitle, sessionId, isComposing) {
 		clearTimeout(timer);
 		controller?.abort();
 		const currentRequest = ++requestId;
 		// Keep composer information in place while the user edits only the title.
-		if (composerName.trim() !== previousComposer) {
+		const context = `${sessionId}:${composerName.trim()}`;
+		if (context !== previousContext) {
 			composers = [];
-			previousComposer = composerName.trim();
+			referenceDate = '';
+			previousContext = context;
 		}
 		works = [];
 		error = '';
-		if (isComposing || !composerName.trim()) return;
+		if (isComposing || !sessionId || !composerName.trim()) return;
 
 		timer = setTimeout(async () => {
 			controller = new AbortController();
 			const params = new URLSearchParams({
+				time_id: sessionId,
 				composer_name: composerName.trim(),
 				title: musicTitle.trim()
 			});
@@ -50,6 +55,7 @@
 				if (!response.ok) throw new Error('Recent play lookup failed');
 				const data = await response.json();
 				if (currentRequest !== requestId) return;
+				referenceDate = data.reference_date;
 				composers = data.composers;
 				works = data.works;
 			} catch (cause) {
@@ -60,7 +66,7 @@
 		}, 300);
 	}
 
-	$: if (mounted) scheduleLookup(composer, title, composing);
+	$: if (mounted) scheduleLookup(composer, title, timeId, composing);
 </script>
 
 <div
@@ -72,8 +78,8 @@
 	<div aria-live="polite" aria-atomic="true">
 		{#if composers.length}
 			<div class="history">
-				<p class="caption">작곡가 최근 선곡 · 오늘 포함</p>
-				<ul>
+				<p class="caption">작곡가 최근 선곡 · {referenceDate} 타임 기준 (당일 포함)</p>
+				<ul class="matches">
 					{#each composers as item}
 						<li>
 							<strong>{item.name}</strong>
@@ -82,7 +88,12 @@
 								선곡됨.
 							</p>
 							{#if item.name.toLowerCase() === composer.trim().toLowerCase()}
-								<p>가장 최근 {item.recent_titles.length}개 선곡: {item.recent_titles.join(', ')}</p>
+								<p class="recent-heading">가장 최근 {item.recent_titles.length}개 선곡:</p>
+								<ul class="recent-titles">
+									{#each item.recent_titles as recentTitle}
+										<li>{recentTitle}</li>
+									{/each}
+								</ul>
 							{/if}
 						</li>
 					{/each}
@@ -95,15 +106,15 @@
 	<div aria-live="polite" aria-atomic="true">
 		{#if works.length}
 			<div class="history">
-				<p class="caption">곡 최근 선곡 · 오늘 포함</p>
-				<ul>
+				<p class="caption">곡 최근 선곡 · {referenceDate} 타임 기준 (당일 포함)</p>
+				<ul class="matches">
 					{#each works as item}
 						<li>
 							<strong>{item.composer_name} · {item.title}</strong>
 							<p>최근 30일간 {item.count_30d}회 선곡됨.</p>
 							<p>
 								가장 최근 선곡: {item.days_since_last_played === 0
-									? '오늘'
+									? '타임 당일'
 									: `${item.days_since_last_played}일 전`} ({item.last_played})
 							</p>
 						</li>
@@ -149,10 +160,18 @@
 		margin: 0;
 		padding: 0;
 	}
-	li + li {
+	.matches > li + li {
 		margin-top: 8px;
 		padding-top: 8px;
 		border-top: 1px solid var(--gray-gray-300, #d4d4d4);
+	}
+	.recent-heading {
+		margin-top: 6px;
+	}
+	.recent-titles {
+		list-style: disc;
+		margin-top: 4px;
+		padding-left: 1.25em;
 	}
 	.error {
 		margin-top: 8px;
