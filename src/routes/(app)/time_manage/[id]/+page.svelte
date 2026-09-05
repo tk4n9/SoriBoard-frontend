@@ -6,6 +6,7 @@
 	import { goto } from '$app/navigation';
 	import MusicInfo from '$lib/components/musicinfo.svelte';
 	import Input from '$lib/components/input.svelte';
+	import MusicHistoryInputs from '$lib/components/MusicHistoryInputs.svelte';
 	import BreakButton from '$lib/components/breakButton.svelte';
 	import instalogo from '$lib/images/insta.svg';
 	import plusicon from '$lib/images/plus.svg';
@@ -538,8 +539,7 @@
 					<Input label="음원 종류" width="100px" bind:value={source}></Input>
 					<Input label="음반 번호" width="100px" bind:value={cd_id}></Input>
 				</div>
-				<Input label="작곡가" bind:value={composer}></Input>
-				<Input label="제목" bind:value={title}></Input>
+				<MusicHistoryInputs bind:composer bind:title />
 				<Input label="곡 세부 정보(악장 등)" bind:value={detail}></Input>
 				<Input label="오케스트라/실내악단" bind:value={orchestra}></Input>
 				<Input label="지휘자" bind:value={conductor}></Input>
