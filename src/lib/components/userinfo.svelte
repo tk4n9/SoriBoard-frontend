@@ -277,12 +277,6 @@
 		font-weight: var(--small-font-weight, 400);
 		width: 100px;
 	}
-	.year_id {
-		font-family: var(--small-font-family, 'NotoSansKr-Regular', sans-serif);
-		font-size: var(--small-font-size, 10px);
-		font-weight: var(--small-font-weight, 400);
-		width: 40px;
-	}
 	.button {
 		display: flex;
 		flex-direction: column;
