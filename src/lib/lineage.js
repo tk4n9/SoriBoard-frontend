@@ -339,3 +339,34 @@ export function descendantCount(node) {
 	}
 	return count;
 }
+
+// The members `node` can take as 사부, in name order: not the member, and not anyone whose 사부
+// line as recorded leads back to them, as the new link would close a loop. The current 사부
+// stays a choice while their line is drawn, even when an older loop runs through them.
+export function sabuChoices(lineage, node) {
+	const { byId } = lineage;
+	const recorded = (n) => {
+		const id = n.user.sabu_id;
+		if (id === null || id === undefined || id === '') return null;
+		return byId.get(Number(id)) ?? null;
+	};
+	const blocked = new Set([node]);
+	const clear = new Set();
+	for (const start of byId.values()) {
+		const path = new Set();
+		let n = start;
+		while (n && !blocked.has(n) && !clear.has(n) && !path.has(n)) {
+			path.add(n);
+			n = recorded(n);
+		}
+		const into = n && blocked.has(n) ? blocked : clear;
+		for (const visited of path) into.add(visited);
+	}
+	return [...byId.values()]
+		.filter((n) => !blocked.has(n) || n === node.parent)
+		.sort(
+			(a, b) =>
+				String(a.user.name ?? '').localeCompare(String(b.user.name ?? ''), 'ko') ||
+				compareMembers(a.user, b.user)
+		);
+}
