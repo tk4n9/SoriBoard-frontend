@@ -1,7 +1,7 @@
 // labels/values 봉투를 CSV 문자열로 만들고 다운로드한다.
 // Excel 에서 한글이 깨지지 않도록 UTF-8 BOM 을 앞에 붙인다.
 
-function escapeCell(value) {
+export function escapeCell(value) {
 	const s = String(value ?? '');
 	if (/[",\n]/.test(s)) {
 		return '"' + s.replace(/"/g, '""') + '"';
@@ -18,7 +18,12 @@ export function toCsv(labels, values, headers = ['항목', '횟수']) {
 }
 
 export function downloadCsv(filename, labels, values, headers) {
-	const csv = '﻿' + toCsv(labels, values, headers);
+	saveCsv(filename, toCsv(labels, values, headers));
+}
+
+// CSV 문자열을 파일로 내려받는다.
+export function saveCsv(filename, text) {
+	const csv = '﻿' + text;
 	const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
 	const url = URL.createObjectURL(blob);
 	const a = document.createElement('a');
