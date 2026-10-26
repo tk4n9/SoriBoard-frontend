@@ -16,6 +16,7 @@
 	import { readStatQuery, statQueryHref } from '$lib/statQuery.js';
 	import { createLatestRequests } from '$lib/latestRequest.js';
 	import { requestGroups, genreDistribution } from '$lib/statCards.js';
+	import { chooseTimelineBucket, timelineBucketName, timelineView } from '$lib/statBucket.js';
 	import {
 		CURRENT,
 		ALL,
@@ -65,8 +66,17 @@
 	let startDate = recentSemesterStart();
 	let endDate = toISODate(new Date());
 
-	let timelineBucket = 'month';
 	let diversityBucket = 'month'; // 'week' | 'month'
+	// 기간별 선곡 추이의 단위: 한 학기를 넘으면 학기별, 아니면 토글이 보이지 않는 쪽(statBucket.js).
+	const nextTimelineBucket = () =>
+		chooseTimelineBucket(
+			period === CUSTOM
+				? { period, start: customStart, end: customEnd }
+				: { period, start: startDate, end: endDate },
+			diversityBucket,
+			endDate
+		);
+	let timelineBucket = nextTimelineBucket();
 	// 백엔드가 적용했다고 돌려준 기간(filters). 기간이 바뀔 때만 비운다.
 	let appliedFilters = null;
 
@@ -157,7 +167,10 @@
 			})
 		);
 	}
-	const loadAll = () => load(CARD_KEYS);
+	const loadAll = () => {
+		timelineBucket = nextTimelineBucket();
+		return load(CARD_KEYS);
+	};
 
 	onMount(loadAll);
 
@@ -181,7 +194,13 @@
 	function setDiversityBucket(b) {
 		if (diversityBucket === b) return;
 		diversityBucket = b;
-		load(['diversity']);
+		// 한 학기 이하면 기간별 선곡 추이도 반대 단위로 바뀌므로 함께 다시 부른다.
+		const next = nextTimelineBucket();
+		if (next === timelineBucket) load(['diversity']);
+		else {
+			timelineBucket = next;
+			load(['diversity', 'timeline']);
+		}
 	}
 
 	// 부제: 현재 범위 + 전체 선곡 수.
@@ -212,7 +231,9 @@
 		conductors && horizontalBarOption(conductors, '많이 튼 지휘자', subtitleFor(conductors));
 	$: orchestraOpt =
 		orchestras && horizontalBarOption(orchestras, '많이 튼 오케스트라', subtitleFor(orchestras));
-	$: timelineOpt = timeline && timelineOption(timeline, '기간별 선곡 추이', scopeLabel);
+	$: timelineTitle = `${timelineBucketName(timelineBucket)} 선곡 추이`;
+	$: timelineData = timeline && timelineView(timeline);
+	$: timelineOpt = timelineData && timelineOption(timelineData, timelineTitle, scopeLabel);
 	$: eraOpt = eras && eraPieOption(eras, '시대별 분포', subtitleFor(eras));
 	$: eraNote =
 		eras && eras.unknown_share > 0.2
@@ -355,9 +376,9 @@
 				csvHeaders={['장르', '횟수']}
 			/>
 			<ChartCard
-				title="기간별 선곡 추이"
+				title={timelineTitle}
 				option={timelineOpt}
-				data={timeline}
+				data={timelineData}
 				loading={loading.timeline}
 				error={errors.timeline}
 				csvHeaders={['기간', '횟수']}
