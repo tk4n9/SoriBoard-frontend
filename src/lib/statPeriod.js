@@ -43,6 +43,20 @@ export function writeStatPeriod(params, period, range = {}) {
 	} else if (period !== CURRENT) params.set('semester_id', String(period));
 }
 
+// 이번 학기 = 가장 최근 학기의 시작일부터 오늘까지(YYYY-MM-DD). 3/1 이후 9/1 이전이면 올해 3/1,
+// 그 외에는 가장 가까운 9/1 부터다(1~2월이면 작년 9/1 부터인 직전 2학기).
+export function currentSemesterRange(today = new Date()) {
+	const y = today.getFullYear();
+	const mar1 = new Date(y, 2, 1); // 3월
+	const sep1 = new Date(y, 8, 1); // 9월
+	let start = `${y - 1}-09-01`;
+	if (today >= mar1 && today < sep1) start = `${y}-03-01`;
+	else if (today >= sep1) start = `${y}-09-01`;
+	const p = (/** @type {number} */ n) => String(n).padStart(2, '0');
+	const end = `${y}-${p(today.getMonth() + 1)}-${p(today.getDate())}`;
+	return { start, end };
+}
+
 // 'YYYY-MM-DD' 형식이고 달력에 있는 날짜인가(2025-02-30 은 아니다).
 /** @param {string} value */
 export function isIsoDate(value) {

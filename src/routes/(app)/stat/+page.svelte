@@ -27,7 +27,8 @@
 		readStatPeriod,
 		readStatRange,
 		writeStatPeriod,
-		periodRangeText
+		periodRangeText,
+		currentSemesterRange
 	} from '$lib/statPeriod.js';
 
 	// 범위·지기·견습 포함·기간은 URL에도 둔다(링크로 같은 보기를 연다). 페이지가 시작될 때 한 번만 읽는다.
@@ -51,23 +52,8 @@
 		});
 	}
 
-	// 기본 기간 = 가장 최근 학기. 3/1 이후 9/1 이전이면 올해 3/1, 그 외에는 가장 가까운 9/1.
-	// (1~2월이면 작년 9/1 부터인 직전 2학기.)
-	function recentSemesterStart(today = new Date()) {
-		const y = today.getFullYear();
-		const mar1 = new Date(y, 2, 1); // 3월
-		const sep1 = new Date(y, 8, 1); // 9월
-		if (today >= mar1 && today < sep1) return `${y}-03-01`;
-		if (today >= sep1) return `${y}-09-01`;
-		return `${y - 1}-09-01`;
-	}
-	function toISODate(d) {
-		const p = (n) => String(n).padStart(2, '0');
-		return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
-	}
-
-	let startDate = recentSemesterStart();
-	let endDate = toISODate(new Date());
+	// 기본 기간 = 가장 최근 학기의 시작일부터 오늘까지(선곡 기록과 같은 규칙, statPeriod.js).
+	let { start: startDate, end: endDate } = currentSemesterRange();
 
 	let diversityBucket = 'month'; // 'week' | 'month'
 	// 기간별 선곡 추이의 단위: 한 학기를 넘으면 학기별, 아니면 토글이 보이지 않는 쪽(statBucket.js).

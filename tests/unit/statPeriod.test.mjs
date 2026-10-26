@@ -12,7 +12,8 @@ import {
 	knownPeriod,
 	periodRangeText,
 	isIsoDate,
-	rangeError
+	rangeError,
+	currentSemesterRange
 } from '../../src/lib/statPeriod.js';
 
 const read = (search) => readStatPeriod(new URLSearchParams(search));
@@ -231,4 +232,15 @@ test('the box refuses an empty or backwards range', () => {
 		rangeError({ start: '2025-03-01', end: '2025-02-30' }),
 		'날짜를 YYYY-MM-DD 형식으로 넣어 주세요.'
 	);
+});
+
+test('이번 학기 runs from the latest 3/1 or 9/1 to today', () => {
+	const range = (y, m, d) => currentSemesterRange(new Date(y, m - 1, d, 13, 5));
+	assert.deepEqual(range(2026, 3, 1), { start: '2026-03-01', end: '2026-03-01' });
+	assert.deepEqual(range(2026, 8, 31), { start: '2026-03-01', end: '2026-08-31' });
+	assert.deepEqual(range(2026, 9, 1), { start: '2026-09-01', end: '2026-09-01' });
+	assert.deepEqual(range(2026, 12, 31), { start: '2026-09-01', end: '2026-12-31' });
+	// 1~2월은 작년 9/1 부터인 2학기
+	assert.deepEqual(range(2027, 1, 5), { start: '2026-09-01', end: '2027-01-05' });
+	assert.deepEqual(range(2027, 2, 28), { start: '2026-09-01', end: '2027-02-28' });
 });
