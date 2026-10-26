@@ -17,6 +17,7 @@
 	import { createLatestRequests } from '$lib/latestRequest.js';
 	import { requestGroups, genreDistribution } from '$lib/statCards.js';
 	import { chooseTimelineBucket, timelineBucketName, timelineView } from '$lib/statBucket.js';
+	import { rankTable, shareTable, seriesTable, formatEvenness } from '$lib/statTable.js';
 	import {
 		CURRENT,
 		ALL,
@@ -264,6 +265,13 @@
 		labels: diversity.timeline.labels,
 		values: diversity.timeline.era_evenness
 	};
+	// 표로 보기: 다양성 추이는 두 계열을 모두 싣는다(그 밖의 시계열 카드는 data 로 만든다).
+	$: diversityTable =
+		diversity &&
+		seriesTable(diversity.timeline.labels, '기간', [
+			{ name: '시대 다양성', values: diversity.timeline.era_evenness, format: formatEvenness },
+			{ name: '장르 다양성', values: diversity.timeline.genre_evenness, format: formatEvenness }
+		]);
 	$: pct = (v) => (v == null ? '—' : `${Math.round(v * 100)}%`);
 </script>
 
@@ -332,6 +340,7 @@
 				data={composers}
 				loading={loading.composers}
 				error={errors.composers}
+				table={composers && rankTable(composers, '작곡가')}
 				csvHeaders={['작곡가', '횟수']}
 			/>
 			<ChartCard
@@ -340,6 +349,7 @@
 				data={soloists}
 				loading={loading.soloists}
 				error={errors.soloists}
+				table={soloists && rankTable(soloists, '연주자')}
 				csvHeaders={['연주자', '횟수']}
 			/>
 			<ChartCard
@@ -348,6 +358,7 @@
 				data={conductors}
 				loading={loading.conductors}
 				error={errors.conductors}
+				table={conductors && rankTable(conductors, '지휘자')}
 				csvHeaders={['지휘자', '횟수']}
 			/>
 			<ChartCard
@@ -356,6 +367,7 @@
 				data={orchestras}
 				loading={loading.orchestras}
 				error={errors.orchestras}
+				table={orchestras && rankTable(orchestras, '오케스트라')}
 				csvHeaders={['오케스트라', '횟수']}
 			/>
 			<ChartCard
@@ -365,6 +377,7 @@
 				loading={loading.eras}
 				error={errors.eras}
 				note={eraNote}
+				table={eras && shareTable(eras, '시대')}
 				csvHeaders={['시대', '횟수']}
 			/>
 			<ChartCard
@@ -373,6 +386,7 @@
 				data={genres}
 				loading={loading.genres}
 				error={errors.genres}
+				table={genres && shareTable(genres, '장르')}
 				csvHeaders={['장르', '횟수']}
 			/>
 			<ChartCard
@@ -436,6 +450,7 @@
 				title={`${bucketLabel} 다양성 추이`}
 				option={diversityOpt}
 				data={diversityCsvData}
+				table={diversityTable}
 				loading={loading.diversity}
 				error={errors.diversity}
 				csvHeaders={['기간', '시대다양성']}

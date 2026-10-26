@@ -1,5 +1,7 @@
 <script>
 	import EChart from './EChart.svelte';
+	import DataTable from './DataTable.svelte';
+	import { seriesTable } from '$lib/statTable.js';
 	import { downloadCsv, downloadDataUrl, todayStamp } from '$lib/csv.js';
 
 	export let title = '';
@@ -9,12 +11,21 @@
 	export let loading = false;
 	export let note = ''; // 데이터 경고 등
 	export let error = ''; // 불러오기 실패 문구
+	export let table = null; // '표로 보기'의 표(statTable.js). 없으면 data 와 csvHeaders 로 만든다.
 
 	let chartRef;
+	// 표로 보기: 캔버스는 키보드·화면 낭독기로 읽을 수 없으므로 같은 수치를 표로 보인다.
+	// 다시 불러와도 그대로 두고, 차트는 숨긴 채 남겨 PNG 저장이 계속 된다.
+	let showTable = false;
 
 	$: hasData = data && data.labels && data.labels.length > 0;
 	// 불러오는 동안 data 는 아직 이전 필터의 것이고 차트는 내려가 있으므로 저장을 막는다.
 	$: canExport = hasData && !loading;
+	$: shownTable =
+		table ??
+		(hasData
+			? seriesTable(data.labels, csvHeaders[0], [{ name: csvHeaders[1], values: data.values }])
+			: null);
 
 	function exportPng() {
 		const url = chartRef && chartRef.getPng();
@@ -27,6 +38,16 @@
 </script>
 
 <div class="card">
+	<button
+		class="tool-btn view-toggle"
+		class:active={showTable}
+		aria-pressed={showTable}
+		on:click={() => (showTable = !showTable)}
+		title="차트의 수치를 표로 보기"
+		aria-label={`${title} 표로 보기`}
+	>
+		표로 보기
+	</button>
 	<div class="toolbar">
 		<button
 			class="tool-btn"
@@ -57,7 +78,12 @@
 		{:else if !hasData}
 			<div class="placeholder">데이터가 없습니다</div>
 		{:else}
-			<EChart bind:this={chartRef} {option} />
+			<div class="chart-view" class:hidden={showTable && shownTable}>
+				<EChart bind:this={chartRef} {option} />
+			</div>
+			{#if showTable && shownTable}
+				<DataTable table={shownTable} {title} subtitle={option?.title?.subtext ?? ''} />
+			{/if}
 		{/if}
 	</div>
 
@@ -99,6 +125,17 @@
 	.tool-btn:hover:not(:disabled) {
 		background: var(--secondary-secondary-200, #fdf1e4);
 	}
+	/* 가운데 차트 제목과 겹치지 않도록 오른쪽 저장 버튼들과 떨어진 왼쪽 위에 둔다. */
+	.view-toggle {
+		position: absolute;
+		top: 12px;
+		left: 12px;
+		z-index: 2;
+	}
+	.view-toggle.active {
+		background: var(--action-bg);
+		color: var(--action-fg);
+	}
 	.tool-btn:disabled {
 		/* exact swatches instead of a 40% opacity blend */
 		color: var(--gray-gray-500);
@@ -109,6 +146,13 @@
 	.chart-area {
 		flex: 1;
 		min-height: 340px;
+	}
+	/* 차트 크기 계산(height: 100%)이 그대로 이어지도록 상자를 만들지 않는다. */
+	.chart-view {
+		display: contents;
+	}
+	.chart-view.hidden {
+		display: none;
 	}
 	.placeholder {
 		display: flex;
