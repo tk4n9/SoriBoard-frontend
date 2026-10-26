@@ -15,6 +15,7 @@
 	} from '$lib/chartOptions.js';
 	import { readStatQuery, statQueryHref } from '$lib/statQuery.js';
 	import { createLatestRequests } from '$lib/latestRequest.js';
+	import { requestGroups, genreDistribution } from '$lib/statCards.js';
 	import {
 		CURRENT,
 		ALL,
@@ -96,7 +97,8 @@
 		return res.json();
 	}
 
-	// 카드(응답)마다 요청. 카드는 따로 불러오고, 실패하면 그 카드에만 오류를 띄운다.
+	// 카드는 따로 불러오고, 실패하면 그 카드에만 오류를 띄운다. 요청 하나가 여러 카드를 그릴 수 있다:
+	// 장르별 분포는 따로 부르지 않고 다양성 응답으로 그린다(statCards.js).
 	const cardRequests = {
 		summary: () => getJson('summary'),
 		composers: () => getJson('composers', { limit: 12 }),
@@ -105,10 +107,11 @@
 		orchestras: () => getJson('orchestras', { limit: 10 }),
 		timeline: () => getJson('timeline', { bucket: timelineBucket }),
 		eras: () => getJson('eras'),
-		genres: () => getJson('genres'),
 		diversity: () => getJson('diversity', { bucket: diversityBucket })
 	};
-	const CARD_KEYS = Object.keys(cardRequests);
+	// 다른 카드의 응답에서 꺼내 그리는 카드.
+	const pickCard = { genres: genreDistribution };
+	const CARD_KEYS = [...Object.keys(cardRequests), ...Object.keys(pickCard)];
 
 	/** @type {Record<string, any>} */
 	let data = {};
@@ -133,19 +136,23 @@
 			errors[key] = '';
 		}
 		await Promise.allSettled(
-			keys.map(async (key) => {
+			requestGroups(keys).map(async ([request, cards]) => {
+				// 주별/월별로 다양성만 다시 부르면 장르 카드는 덮이지 않으므로, 진행 중인 전체 로드의
+				// 다양성 응답이 장르 카드를 채운다(summary 는 버킷과 무관하다).
+				const latest = () => cards.filter((key) => requests.isLatest(key, id));
 				try {
-					const result = await cardRequests[key]();
-					if (!requests.isLatest(key, id)) return;
-					data[key] = result;
-					// 모든 통계 응답이 적용된 기간(filters)을 돌려준다.
-					appliedFilters = result.filters;
+					const result = await cardRequests[request]();
+					for (const key of latest()) {
+						data[key] = pickCard[key] ? pickCard[key](result) : result;
+						// 모든 통계 응답이 적용된 기간(filters)을 돌려준다.
+						appliedFilters = result.filters;
+					}
 				} catch (e) {
-					if (!requests.isLatest(key, id)) return;
-					console.error(`통계 로딩 실패 (${key})`, e);
-					errors[key] = '불러오지 못했습니다';
+					const failed = latest();
+					if (failed.length) console.error(`통계 로딩 실패 (${request})`, e);
+					for (const key of failed) errors[key] = '불러오지 못했습니다';
 				} finally {
-					if (requests.isLatest(key, id)) loading[key] = false;
+					for (const key of latest()) loading[key] = false;
 				}
 			})
 		);
