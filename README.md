@@ -27,3 +27,12 @@ To open the page in browser immediately, run
 ```
   $ npm run dev -- --open
 ```
+
+### HOW TO TEST?
+
+Pure helpers in `src/lib/` have unit tests in `tests/unit/` (Node's built-in
+test runner, no extra dependency):
+
+```
+  $ node --test 'tests/unit/*.test.mjs'
+```

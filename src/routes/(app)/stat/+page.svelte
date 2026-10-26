@@ -1,5 +1,7 @@
 <script>
 	import { onMount } from 'svelte';
+	import { page } from '$app/stores';
+	import { goto } from '$app/navigation';
 	import ChartCard from '$lib/components/stat/ChartCard.svelte';
 	import ScopeToggle from '$lib/components/stat/ScopeToggle.svelte';
 	import MemberSelect from '$lib/components/stat/MemberSelect.svelte';
@@ -10,10 +12,22 @@
 		countBarOption,
 		diversityLineOption
 	} from '$lib/chartOptions.js';
+	import { readStatQuery, statQueryHref } from '$lib/statQuery.js';
 
-	let scope = 'all';
-	let userId = null;
-	let includeMentees = false;
+	// 범위·지기·견습 포함은 URL에도 둔다(링크로 같은 보기를 연다). 페이지가 시작될 때 한 번만 읽는다.
+	const initial = readStatQuery($page.url.searchParams);
+	let scope = initial.scope;
+	let userId = initial.userId;
+	let includeMentees = initial.includeMentees;
+
+	// 보기가 바뀌면 URL을 바꾼다. 히스토리를 쌓지 않고, 포커스·스크롤도 그대로 둔다.
+	function syncUrl() {
+		goto(statQueryHref($page.url, { scope, userId, includeMentees }), {
+			replaceState: true,
+			keepFocus: true,
+			noScroll: true
+		});
+	}
 
 	// 기본 기간 = 가장 최근 학기. 3/1 이후 9/1 이전이면 올해 3/1, 그 외에는 가장 가까운 9/1.
 	// (1~2월이면 작년 9/1 부터인 직전 2학기.)
@@ -104,11 +118,13 @@
 
 	function onScopeChange(e) {
 		scope = e.detail;
+		syncUrl();
 		loadAll();
 	}
 	function onMemberChange(e) {
 		userId = e.detail.userId;
 		includeMentees = e.detail.includeMentees;
+		syncUrl();
 		loadAll();
 	}
 	function setDiversityBucket(b) {
