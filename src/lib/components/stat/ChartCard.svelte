@@ -8,6 +8,7 @@
 	export let csvHeaders = ['항목', '횟수'];
 	export let loading = false;
 	export let note = ''; // 데이터 경고 등
+	export let error = ''; // 불러오기 실패 문구
 
 	let chartRef;
 
@@ -50,6 +51,9 @@
 	<div class="chart-area">
 		{#if loading}
 			<div class="placeholder">불러오는 중...</div>
+		{:else if error}
+			<!-- 제목은 차트가 그리므로, 실패하면 어느 카드인지 여기서 밝힌다. -->
+			<div class="placeholder error">{title} — {error}</div>
 		{:else if !hasData}
 			<div class="placeholder">데이터가 없습니다</div>
 		{:else}
@@ -114,6 +118,9 @@
 		color: var(--gray-gray-500, #9f9f9f);
 		font-family: var(--medium-font-family, 'Noto Sans KR', sans-serif);
 		font-size: var(--medium-font-size, 16px);
+	}
+	.placeholder.error {
+		color: var(--secondary-secondary-800, #95560d);
 	}
 	.note {
 		margin-top: 4px;

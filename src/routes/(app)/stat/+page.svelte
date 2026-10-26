@@ -14,6 +14,7 @@
 		diversityLineOption
 	} from '$lib/chartOptions.js';
 	import { readStatQuery, statQueryHref } from '$lib/statQuery.js';
+	import { createLatestRequests } from '$lib/latestRequest.js';
 	import {
 		CURRENT,
 		ALL,
@@ -63,16 +64,6 @@
 	let startDate = recentSemesterStart();
 	let endDate = toISODate(new Date());
 
-	let loading = true;
-	let summary = null;
-	let composers = null;
-	let soloists = null;
-	let conductors = null;
-	let orchestras = null;
-	let timeline = null;
-	let eras = null;
-	let genres = null;
-	let diversity = null;
 	let timelineBucket = 'month';
 	let diversityBucket = 'month'; // 'week' | 'month'
 	// 백엔드가 적용했다고 돌려준 기간(filters). 기간이 바뀔 때만 비운다.
@@ -105,40 +96,61 @@
 		return res.json();
 	}
 
-	// 가장 최근에 시작한 로드만 반영한다. 늦게 도착한 이전 로드의 응답은 버린다.
-	let loadId = 0;
+	// 카드(응답)마다 요청. 카드는 따로 불러오고, 실패하면 그 카드에만 오류를 띄운다.
+	const cardRequests = {
+		summary: () => getJson('summary'),
+		composers: () => getJson('composers', { limit: 12 }),
+		soloists: () => getJson('soloists', { limit: 12 }),
+		conductors: () => getJson('conductors', { limit: 10 }),
+		orchestras: () => getJson('orchestras', { limit: 10 }),
+		timeline: () => getJson('timeline', { bucket: timelineBucket }),
+		eras: () => getJson('eras'),
+		genres: () => getJson('genres'),
+		diversity: () => getJson('diversity', { bucket: diversityBucket })
+	};
+	const CARD_KEYS = Object.keys(cardRequests);
 
-	async function loadAll() {
+	/** @type {Record<string, any>} */
+	let data = {};
+	/** @type {Record<string, boolean>} */
+	let loading = Object.fromEntries(CARD_KEYS.map((key) => [key, true]));
+	/** @type {Record<string, string>} */
+	let errors = {};
+	$: ({ summary, composers, soloists, conductors, orchestras, timeline, eras, genres, diversity } =
+		data);
+
+	// 카드마다 자기를 덮는 가장 최근 요청의 응답만 반영한다. 늦게 도착한 이전 요청의 응답은 버린다.
+	const requests = createLatestRequests();
+
+	async function load(keys) {
 		// 개인 범위인데 지기 미선택이면 로드 보류.
 		if (scope === 'individual' && !userId) return;
-		const id = ++loadId;
-		loading = true;
-		// 불러오는 동안(그리고 실패한 뒤) 이전 필터의 수치가 새 필터의 이름으로 남아 보이지 않도록 비운다.
-		[summary, composers, soloists, conductors, orchestras, timeline, eras, genres, diversity] = [];
-		try {
-			const results = await Promise.all([
-				getJson('summary'),
-				getJson('composers', { limit: 12 }),
-				getJson('soloists', { limit: 12 }),
-				getJson('conductors', { limit: 10 }),
-				getJson('orchestras', { limit: 10 }),
-				getJson('timeline', { bucket: timelineBucket }),
-				getJson('eras'),
-				getJson('genres'),
-				getJson('diversity', { bucket: diversityBucket })
-			]);
-			if (id !== loadId) return;
-			[summary, composers, soloists, conductors, orchestras, timeline, eras, genres, diversity] =
-				results;
-			appliedFilters = summary.filters;
-		} catch (e) {
-			if (id !== loadId) return;
-			console.error('통계 로딩 실패', e);
-			alert('통계를 불러오지 못했습니다.');
-		} finally {
-			if (id === loadId) loading = false;
+		const id = requests.begin(keys);
+		for (const key of keys) {
+			// 불러오는 동안(그리고 실패한 뒤) 이전 필터의 수치가 새 필터의 이름으로 남아 보이지 않도록 비운다.
+			data[key] = null;
+			loading[key] = true;
+			errors[key] = '';
 		}
+		await Promise.allSettled(
+			keys.map(async (key) => {
+				try {
+					const result = await cardRequests[key]();
+					if (!requests.isLatest(key, id)) return;
+					data[key] = result;
+					// 모든 통계 응답이 적용된 기간(filters)을 돌려준다.
+					appliedFilters = result.filters;
+				} catch (e) {
+					if (!requests.isLatest(key, id)) return;
+					console.error(`통계 로딩 실패 (${key})`, e);
+					errors[key] = '불러오지 못했습니다';
+				} finally {
+					if (requests.isLatest(key, id)) loading[key] = false;
+				}
+			})
+		);
 	}
+	const loadAll = () => load(CARD_KEYS);
 
 	onMount(loadAll);
 
@@ -162,7 +174,7 @@
 	function setDiversityBucket(b) {
 		if (diversityBucket === b) return;
 		diversityBucket = b;
-		loadAll();
+		load(['diversity']);
 	}
 
 	// 부제: 현재 범위 + 전체 선곡 수.
@@ -280,6 +292,9 @@
 				<div class="kpi-label">기간</div>
 			</div>
 		</div>
+		{#if errors.summary}
+			<p class="kpi-error">요약을 불러오지 못했습니다.</p>
+		{/if}
 
 		<!-- 차트 그리드 -->
 		<div class="chart-grid">
@@ -287,35 +302,40 @@
 				title="많이 튼 작곡가"
 				option={composerOpt}
 				data={composers}
-				{loading}
+				loading={loading.composers}
+				error={errors.composers}
 				csvHeaders={['작곡가', '횟수']}
 			/>
 			<ChartCard
 				title="많이 튼 독주자"
 				option={soloistOpt}
 				data={soloists}
-				{loading}
+				loading={loading.soloists}
+				error={errors.soloists}
 				csvHeaders={['연주자', '횟수']}
 			/>
 			<ChartCard
 				title="많이 튼 지휘자"
 				option={conductorOpt}
 				data={conductors}
-				{loading}
+				loading={loading.conductors}
+				error={errors.conductors}
 				csvHeaders={['지휘자', '횟수']}
 			/>
 			<ChartCard
 				title="많이 튼 오케스트라"
 				option={orchestraOpt}
 				data={orchestras}
-				{loading}
+				loading={loading.orchestras}
+				error={errors.orchestras}
 				csvHeaders={['오케스트라', '횟수']}
 			/>
 			<ChartCard
 				title="시대별 분포"
 				option={eraOpt}
 				data={eras}
-				{loading}
+				loading={loading.eras}
+				error={errors.eras}
 				note={eraNote}
 				csvHeaders={['시대', '횟수']}
 			/>
@@ -323,14 +343,16 @@
 				title="장르별 분포"
 				option={genreOpt}
 				data={genres}
-				{loading}
+				loading={loading.genres}
+				error={errors.genres}
 				csvHeaders={['장르', '횟수']}
 			/>
 			<ChartCard
 				title="기간별 선곡 추이"
 				option={timelineOpt}
 				data={timeline}
-				{loading}
+				loading={loading.timeline}
+				error={errors.timeline}
 				csvHeaders={['기간', '횟수']}
 			/>
 		</div>
@@ -378,14 +400,16 @@
 				title={`${bucketLabel} 선곡 수`}
 				option={countOpt}
 				data={countData}
-				{loading}
+				loading={loading.diversity}
+				error={errors.diversity}
 				csvHeaders={['기간', '선곡수']}
 			/>
 			<ChartCard
 				title={`${bucketLabel} 다양성 추이`}
 				option={diversityOpt}
 				data={diversityCsvData}
-				{loading}
+				loading={loading.diversity}
+				error={errors.diversity}
 				csvHeaders={['기간', '시대다양성']}
 			/>
 		</div>
@@ -463,6 +487,13 @@
 		font-family: var(--small-medium-font-family, 'Noto Sans KR', sans-serif);
 		font-size: var(--small-medium-font-size, 13px);
 		color: var(--gray-gray-600, #7c7c7c);
+	}
+	.kpi-error {
+		margin: -8px 0 16px;
+		text-align: center;
+		font-family: var(--small-medium-font-family, 'Noto Sans KR', sans-serif);
+		font-size: var(--small-medium-font-size, 13px);
+		color: var(--secondary-secondary-800, #95560d);
 	}
 	.chart-grid {
 		display: grid;
