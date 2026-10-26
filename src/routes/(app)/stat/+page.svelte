@@ -335,6 +335,7 @@
 			<h1>통계</h1>
 			<span class="period">{periodText}</span>
 			<a class="history-link" href={historyLink}>선곡 기록</a>
+			<a class="history-link" href="/stat/composers">작곡가 정리</a>
 		</div>
 		<div class="controls">
 			<PeriodSelect
@@ -463,6 +464,7 @@
 				loading={loading.eras}
 				error={errors.eras}
 				note={eraNote}
+				noteLink={{ href: '/stat/composers', text: '작곡가 정리' }}
 				table={eras && shareTable(eras, '시대')}
 				csvHeaders={['시대', '횟수']}
 			/>

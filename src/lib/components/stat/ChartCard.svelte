@@ -10,6 +10,7 @@
 	export let csvHeaders = ['항목', '횟수'];
 	export let loading = false;
 	export let note = ''; // 데이터 경고 등
+	export let noteLink = null; // { href, text }: 경고 뒤에 붙는 링크(예: 작곡가 정리)
 	export let error = ''; // 불러오기 실패 문구
 	export let table = null; // '표로 보기'의 표(statTable.js). 없으면 data 와 csvHeaders 로 만든다.
 	export let rowLabel = ''; // 주면 표의 이름 칸이 단추가 된다(예: '곡 보기', DataTable 의 rowselect).
@@ -95,7 +96,9 @@
 	</div>
 
 	{#if note}
-		<div class="note">{note}</div>
+		<div class="note">
+			{note}{#if noteLink}&nbsp;· <a href={noteLink.href}>{noteLink.text}</a>{/if}
+		</div>
 	{/if}
 </div>
 
@@ -179,5 +182,9 @@
 		font-size: var(--small-medium-font-size, 13px);
 		color: var(--secondary-secondary-800, #95560d);
 		text-align: center;
+	}
+	.note a {
+		color: inherit;
+		text-underline-offset: 3px;
 	}
 </style>
