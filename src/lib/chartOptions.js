@@ -82,6 +82,7 @@ export function horizontalBarOption({ labels, values }, title, subtitle) {
 		yAxis: {
 			type: 'category',
 			data: cats,
+			triggerEvent: true, // 이름을 눌러도 그 막대를 누른 것으로(drill-down)
 			axisLine: AXIS_LINE,
 			axisLabel: { fontFamily: FONT, color: TEXT, fontSize: 12, width: 160, overflow: 'truncate' }
 		},

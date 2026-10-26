@@ -12,6 +12,7 @@
 	export let note = ''; // 데이터 경고 등
 	export let error = ''; // 불러오기 실패 문구
 	export let table = null; // '표로 보기'의 표(statTable.js). 없으면 data 와 csvHeaders 로 만든다.
+	export let rowLabel = ''; // 주면 표의 이름 칸이 단추가 된다(예: '곡 보기', DataTable 의 rowselect).
 
 	let chartRef;
 	// 표로 보기: 캔버스는 키보드·화면 낭독기로 읽을 수 없으므로 같은 수치를 표로 보인다.
@@ -79,10 +80,16 @@
 			<div class="placeholder">데이터가 없습니다</div>
 		{:else}
 			<div class="chart-view" class:hidden={showTable && shownTable}>
-				<EChart bind:this={chartRef} {option} />
+				<EChart bind:this={chartRef} {option} on:itemclick />
 			</div>
 			{#if showTable && shownTable}
-				<DataTable table={shownTable} {title} subtitle={option?.title?.subtext ?? ''} />
+				<DataTable
+					table={shownTable}
+					{title}
+					subtitle={option?.title?.subtext ?? ''}
+					{rowLabel}
+					on:rowselect
+				/>
 			{/if}
 		{/if}
 	</div>

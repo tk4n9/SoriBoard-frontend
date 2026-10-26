@@ -1,6 +1,6 @@
 <script>
 	import * as echarts from 'echarts';
-	import { onMount, onDestroy } from 'svelte';
+	import { onMount, onDestroy, createEventDispatcher } from 'svelte';
 
 	export let option = null;
 
@@ -8,9 +8,13 @@
 	let chart;
 	let resizeObserver;
 
+	const dispatch = createEventDispatcher();
+
 	onMount(() => {
 		chart = echarts.init(el, null, { renderer: 'canvas' });
 		if (option) chart.setOption(option);
+		// 막대·조각(축 이름은 triggerEvent 일 때)을 누르면 알린다. dataIndex 는 option 의 데이터 순서다.
+		chart.on('click', (params) => dispatch('itemclick', { dataIndex: params.dataIndex }));
 		resizeObserver = new ResizeObserver(() => chart && chart.resize());
 		resizeObserver.observe(el);
 	});

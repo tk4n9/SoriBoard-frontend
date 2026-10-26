@@ -1,11 +1,12 @@
 <script>
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import ChartCard from '$lib/components/stat/ChartCard.svelte';
 	import ScopeToggle from '$lib/components/stat/ScopeToggle.svelte';
 	import MemberSelect from '$lib/components/stat/MemberSelect.svelte';
 	import PeriodSelect from '$lib/components/stat/PeriodSelect.svelte';
+	import DrillPanel from '$lib/components/stat/DrillPanel.svelte';
 	import {
 		horizontalBarOption,
 		timelineOption,
@@ -18,6 +19,7 @@
 	import { requestGroups, genreDistribution } from '$lib/statCards.js';
 	import { chooseTimelineBucket, timelineBucketName, timelineView } from '$lib/statBucket.js';
 	import { rankTable, shareTable, seriesTable, formatEvenness } from '$lib/statTable.js';
+	import { barItemIndex, drillTarget, drillParams } from '$lib/statDrill.js';
 	import {
 		CURRENT,
 		ALL,
@@ -170,8 +172,57 @@
 	}
 	const loadAll = () => {
 		timelineBucket = nextTimelineBucket();
+		loadDrill();
 		return load(CARD_KEYS);
 	};
+
+	// drill-down: 순위 카드의 막대나 표의 행 → 그 대상의 곡(같은 기간·범위, statDrill.js).
+	// 기간·범위가 바뀌면 같은 대상(id)으로 다시 불러온다.
+	/** @type {import('$lib/statDrill.js').DrillTarget | null} */
+	let drill = null;
+	let drillWorks = null;
+	let drillLoading = false;
+	let drillError = '';
+	/** @type {HTMLElement | null} */
+	let drillOpener = null; // 패널을 연 표의 단추. 닫으면 포커스를 돌려준다.
+
+	async function loadDrill() {
+		if (!drill || (scope === 'individual' && !userId)) return;
+		const id = requests.begin(['drill']);
+		drillWorks = null;
+		drillLoading = true;
+		drillError = '';
+		try {
+			const result = await getJson('works', drillParams(drill));
+			if (requests.isLatest('drill', id)) drillWorks = result;
+		} catch (e) {
+			if (requests.isLatest('drill', id)) {
+				console.error('통계 로딩 실패 (works)', e);
+				drillError = '불러오지 못했습니다';
+			}
+		} finally {
+			if (requests.isLatest('drill', id)) drillLoading = false;
+		}
+	}
+	function openDrill(card, index) {
+		const target = drillTarget(card, data[card], index);
+		if (!target) return;
+		const active = document.activeElement;
+		drillOpener = active instanceof HTMLElement && active.closest('.card') ? active : null;
+		drill = target;
+		loadDrill();
+	}
+	// 막대는 1위가 맨 위에 오도록 뒤집혀 그려진다.
+	const openBar = (card, e) =>
+		openDrill(card, barItemIndex(e.detail.dataIndex, data[card]?.labels?.length ?? 0));
+	async function closeDrill() {
+		requests.begin(['drill']); // 진행 중인 응답은 버린다.
+		drill = null;
+		drillWorks = null;
+		await tick();
+		if (drillOpener?.isConnected) drillOpener.focus();
+		drillOpener = null;
+	}
 
 	onMount(loadAll);
 
@@ -340,6 +391,9 @@
 				data={composers}
 				loading={loading.composers}
 				error={errors.composers}
+				rowLabel="곡 보기"
+				on:itemclick={(e) => openBar('composers', e)}
+				on:rowselect={(e) => openDrill('composers', e.detail)}
 				table={composers && rankTable(composers, '작곡가')}
 				csvHeaders={['작곡가', '횟수']}
 			/>
@@ -349,6 +403,9 @@
 				data={soloists}
 				loading={loading.soloists}
 				error={errors.soloists}
+				rowLabel="곡 보기"
+				on:itemclick={(e) => openBar('soloists', e)}
+				on:rowselect={(e) => openDrill('soloists', e.detail)}
 				table={soloists && rankTable(soloists, '연주자')}
 				csvHeaders={['연주자', '횟수']}
 			/>
@@ -358,6 +415,9 @@
 				data={conductors}
 				loading={loading.conductors}
 				error={errors.conductors}
+				rowLabel="곡 보기"
+				on:itemclick={(e) => openBar('conductors', e)}
+				on:rowselect={(e) => openDrill('conductors', e.detail)}
 				table={conductors && rankTable(conductors, '지휘자')}
 				csvHeaders={['지휘자', '횟수']}
 			/>
@@ -367,6 +427,9 @@
 				data={orchestras}
 				loading={loading.orchestras}
 				error={errors.orchestras}
+				rowLabel="곡 보기"
+				on:itemclick={(e) => openBar('orchestras', e)}
+				on:rowselect={(e) => openDrill('orchestras', e.detail)}
 				table={orchestras && rankTable(orchestras, '오케스트라')}
 				csvHeaders={['오케스트라', '횟수']}
 			/>
@@ -398,6 +461,22 @@
 				csvHeaders={['기간', '횟수']}
 			/>
 		</div>
+		{#if drill}
+			{#key drill}
+				<DrillPanel
+					target={drill}
+					works={drillWorks}
+					loading={drillLoading}
+					error={drillError}
+					{scopeLabel}
+					on:close={closeDrill}
+				/>
+			{/key}
+		{:else}
+			<p class="drill-hint">
+				작곡가·독주자·지휘자·오케스트라의 막대나 이름을 누르면 그 곡들을 봅니다.
+			</p>
+		{/if}
 
 		<!-- 다양성 섹션 -->
 		<div class="section-head">
@@ -537,6 +616,13 @@
 		font-family: var(--small-medium-font-family, 'Noto Sans KR', sans-serif);
 		font-size: var(--small-medium-font-size, 13px);
 		color: var(--secondary-secondary-800, #95560d);
+	}
+	.drill-hint {
+		margin: 8px 0 0;
+		text-align: center;
+		font-family: var(--small-medium-font-family, 'Noto Sans KR', sans-serif);
+		font-size: var(--small-medium-font-size, 13px);
+		color: var(--gray-gray-600, #7c7c7c);
 	}
 	.chart-grid {
 		display: grid;

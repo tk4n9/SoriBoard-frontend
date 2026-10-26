@@ -3,11 +3,17 @@
 </script>
 
 <script>
+	import { createEventDispatcher } from 'svelte';
+
 	// 차트 카드의 '표로 보기': 차트와 같은 제목·부제와 수치를 표로 보인다(statTable.js 의 표).
 	/** @type {import('$lib/statTable.js').Table} */
 	export let table;
 	export let title = '';
 	export let subtitle = '';
+	// 주면 행의 이름 칸이 단추가 되고, 누르면 그 행의 위치로 rowselect 를 알린다(drill-down).
+	export let rowLabel = '';
+
+	const dispatch = createEventDispatcher();
 
 	const titleId = `stat-table-${++nextId}`;
 </script>
@@ -29,10 +35,19 @@
 				</tr>
 			</thead>
 			<tbody>
-				{#each table.rows as row}
+				{#each table.rows as row, r}
 					<tr>
 						{#each row as cell, i}
-							{#if i === table.rowHeader}
+							{#if i === table.rowHeader && rowLabel}
+								<th scope="row" class:numeric={table.columns[i].numeric}>
+									<button
+										class="row-btn"
+										aria-label={`${cell} ${rowLabel}`}
+										title={rowLabel}
+										on:click={() => dispatch('rowselect', r)}>{cell}</button
+									>
+								</th>
+							{:else if i === table.rowHeader}
 								<th scope="row" class:numeric={table.columns[i].numeric}>{cell}</th>
 							{:else}
 								<td class:numeric={table.columns[i].numeric}>{cell}</td>
@@ -100,6 +115,22 @@
 	}
 	tbody tr:last-child > * {
 		border-bottom: none;
+	}
+	/* 이름 단추는 글자처럼 보이고, 누를 수 있다는 것은 밑줄로 알린다 */
+	.row-btn {
+		padding: 0;
+		border: none;
+		background: none;
+		font: inherit;
+		color: inherit;
+		text-align: left;
+		text-decoration: underline;
+		text-decoration-color: var(--gray-gray-500, #656667);
+		text-underline-offset: 3px;
+		cursor: pointer;
+	}
+	.row-btn:hover {
+		text-decoration-thickness: 2px;
 	}
 	/* 수치 칸은 내용만큼, 남는 폭은 이름 칸에 */
 	.numeric {
