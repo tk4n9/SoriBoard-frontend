@@ -32,6 +32,7 @@
 	} from '$lib/statPeriod.js';
 	import { historyHref } from '$lib/playHistory.js';
 	import { composerHref } from '$lib/composerStats.js';
+	import { reportHref } from '$lib/semesterReport.js';
 
 	// 범위·지기·견습 포함·기간은 URL에도 둔다(링크로 같은 보기를 연다). 페이지가 시작될 때 한 번만 읽는다.
 	const initial = readStatQuery($page.url.searchParams);
@@ -336,6 +337,8 @@
 			<span class="period">{periodText}</span>
 			<a class="history-link" href={historyLink}>선곡 기록</a>
 			<a class="history-link" href="/stat/composers">작곡가 정리</a>
+			<!-- 기간이 학기면 그 학기의, 아니면 가장 최근 학기의 결산 -->
+			<a class="history-link" href={reportHref(period)}>학기 결산</a>
 		</div>
 		<div class="controls">
 			<PeriodSelect
