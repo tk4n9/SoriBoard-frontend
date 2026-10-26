@@ -6,12 +6,18 @@
 	import MemberSelect from '$lib/components/stat/MemberSelect.svelte';
 	import PlayTable from '$lib/components/stat/PlayTable.svelte';
 	import { CURRENT, ALL, CUSTOM, currentSemesterRange, periodRangeText } from '$lib/statPeriod.js';
+	import { downloadCsvTable } from '$lib/csvTable.js';
+	import { todayStamp } from '$lib/csv.js';
 	import {
+		EXPORT_PAGE_SIZE,
+		PLAY_CSV_HEADERS,
 		readHistoryQuery,
 		historyHref,
 		statHref,
 		playsParams,
 		appendPage,
+		fetchAllPlays,
+		playCsvRow,
 		targetLookup,
 		targetName,
 		targetText
@@ -82,6 +88,7 @@
 	// 필터가 바뀌면 URL을 바꾸고(히스토리를 쌓지 않고, 포커스·스크롤도 그대로) 처음부터 다시 부른다.
 	function apply() {
 		goto(historyHref(filter()), { replaceState: true, keepFocus: true, noScroll: true });
+		exportError = '';
 		load();
 	}
 
@@ -123,6 +130,41 @@
 		requested = e.target.value;
 		apply();
 	}
+	// CSV 저장: 누른 때의 조건에 맞는 선곡을 모두(불러온 행만이 아니라) 받아 한 파일로 내려받는다.
+	let exporting = false;
+	let exported = 0; // 받은 선곡 수
+	let exportTotal = 0;
+	let exportError = '';
+
+	async function exportCsv() {
+		const wanted = filter();
+		exporting = true;
+		exported = 0;
+		exportTotal = count ?? 0;
+		exportError = '';
+		try {
+			const plays = await fetchAllPlays(
+				async (from) => {
+					const res = await fetch(
+						`/api/plays?${playsParams(wanted, current, from, EXPORT_PAGE_SIZE)}`
+					);
+					if (!res.ok) throw new Error(`plays ${res.status}`);
+					return res.json();
+				},
+				(done, total) => {
+					exported = done;
+					exportTotal = total;
+				}
+			);
+			downloadCsvTable(`선곡기록_${todayStamp()}.csv`, PLAY_CSV_HEADERS, plays.map(playCsvRow));
+		} catch (e) {
+			console.error('선곡 기록 CSV 저장 실패', e);
+			exportError = 'CSV를 만들지 못했습니다.';
+		} finally {
+			exporting = false;
+		}
+	}
+
 	// 해제하면 단추가 사라지므로 포커스를 검색란으로 옮긴다.
 	async function clearTarget() {
 		target = null;
@@ -203,11 +245,26 @@
 		</div>
 	</div>
 
-	<p class="result-count" aria-live="polite">
-		{#if count !== null}
-			총 {count.toLocaleString()}곡{#if q}&nbsp;· '{q}' 검색{/if}
-		{/if}
-	</p>
+	<div class="result-bar">
+		<p class="result-count" aria-live="polite">
+			{#if count !== null}
+				총 {count.toLocaleString()}곡{#if q}&nbsp;· '{q}' 검색{/if}
+			{/if}
+		</p>
+		<div class="export">
+			<span class="more-error" aria-live="polite">{exportError}</span>
+			<button
+				class="tool-btn"
+				on:click={exportCsv}
+				disabled={!count || exporting}
+				title="조건에 맞는 선곡을 모두 CSV로 저장"
+			>
+				{exporting
+					? `CSV 준비 중… ${exported.toLocaleString()} / ${exportTotal.toLocaleString()}`
+					: 'CSV 저장'}
+			</button>
+		</div>
+	</div>
 
 	<section class="card" aria-label="선곡 목록">
 		{#if rows.length > 0}
@@ -340,9 +397,24 @@
 		cursor: default;
 		opacity: 0.6;
 	}
+	.result-bar {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 12px;
+		margin: 20px 0 8px;
+	}
 	.result-count {
 		min-height: 1.5em;
-		margin: 20px 0 8px;
+		margin: 0;
+	}
+	.export {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		font-family: var(--small-medium-font-family, 'Noto Sans KR', sans-serif);
+		font-size: var(--small-medium-font-size, 13px);
+		font-variant-numeric: tabular-nums;
 	}
 	/* ChartCard 와 같은 카드 */
 	.card {

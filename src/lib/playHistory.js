@@ -15,6 +15,8 @@ import { DRILL_CARDS } from './statDrill.js';
 
 // 한 번에 불러오는 선곡 수(plays/ 의 기본값).
 export const PAGE_SIZE = 50;
+// CSV 저장이 한 번에 받는 선곡 수(plays/ 의 limit 최댓값).
+export const EXPORT_PAGE_SIZE = 100;
 const ID = /^[1-9]\d*$/;
 // 대상의 이름을 찾을 때 받는 순위의 길이(백엔드 limit 의 최댓값).
 const LOOKUP_LIMIT = 100;
@@ -106,13 +108,14 @@ export function statHref(filter) {
 	return `/stat${search ? `?${search}` : ''}`;
 }
 
-// plays/ 에 보낼 쿼리. 이번 학기는 그 날짜 범위(current)로 보낸다. offset 부터 PAGE_SIZE 개.
+// plays/ 에 보낼 쿼리. 이번 학기는 그 날짜 범위(current)로 보낸다. offset 부터 limit 개.
 /**
  * @param {HistoryFilter} filter
  * @param {{ start: string, end: string }} current
  * @param {number} [offset]
+ * @param {number} [limit]
  */
-export function playsParams(filter, current, offset = 0) {
+export function playsParams(filter, current, offset = 0, limit = PAGE_SIZE) {
 	const params = new URLSearchParams();
 	const range = filter.period === CURRENT ? current : filter.period === CUSTOM ? filter : null;
 	if (range) {
@@ -126,7 +129,7 @@ export function playsParams(filter, current, offset = 0) {
 	}
 	if (filter.requested) params.set('requested', filter.requested);
 	writeTarget(params, filter.target);
-	params.set('limit', String(PAGE_SIZE));
+	params.set('limit', String(limit));
 	if (offset > 0) params.set('offset', String(offset));
 	return params;
 }
@@ -173,6 +176,28 @@ export function appendPage(rows, page) {
 	return [...rows, ...page.filter((row) => !seen.has(row.id))];
 }
 
+// 조건에 맞는 선곡을 모두 받는다(CSV 저장). fetchPage(offset) 은 plays/ 의 한 쪽
+// ({ count, results })을 돌려준다. count 만큼 받았거나 빈 쪽이 오면 멈춘다. 쪽이 밀려 같은 선곡이
+// 다시 오면 한 번만 남긴다(appendPage). onProgress(받은 수, count)로 진행을 알린다.
+/**
+ * @template {{ id: number }} T
+ * @param {(offset: number) => Promise<{ count: number, results: T[] }>} fetchPage
+ * @param {(done: number, count: number) => void} [onProgress]
+ * @returns {Promise<T[]>}
+ */
+export async function fetchAllPlays(fetchPage, onProgress = () => {}) {
+	/** @type {T[]} */
+	let rows = [];
+	let offset = 0;
+	for (;;) {
+		const page = await fetchPage(offset);
+		rows = appendPage(rows, page.results);
+		offset += page.results.length;
+		onProgress(rows.length, page.count);
+		if (page.results.length === 0 || offset >= page.count) return rows;
+	}
+}
+
 /** @typedef {{ id: number, time_id: number, date: string, time: number, is_requested: boolean,
  *   composer_name?: string, music_title?: string, music_semi_title?: string,
  *   conductor_name?: string, orchestra_name?: string, player_names?: string[],
@@ -208,3 +233,33 @@ export function jigiText(play) {
 		...(play.mentee_names ?? []).map((name) => `${name}(견습)`)
 	].join(', ');
 }
+
+// 선곡 기록 CSV 의 열과 한 선곡의 행. 여러 연주자·지기는 한 칸에 ', ' 로 잇는다.
+export const PLAY_CSV_HEADERS = [
+	'날짜',
+	'타임',
+	'작곡가',
+	'곡',
+	'세부 제목',
+	'연주자',
+	'오케스트라',
+	'지휘자',
+	'지기',
+	'견습 지기',
+	'신청곡'
+];
+
+/** @param {Play} play */
+export const playCsvRow = (play) => [
+	play.date,
+	play.time,
+	play.composer_name,
+	play.music_title,
+	play.music_semi_title,
+	(play.player_names ?? []).join(', '),
+	play.orchestra_name,
+	play.conductor_name,
+	(play.jigi_names ?? []).join(', '),
+	(play.mentee_names ?? []).join(', '),
+	play.is_requested ? 'O' : ''
+];

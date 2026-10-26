@@ -2,6 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
 	PAGE_SIZE,
+	EXPORT_PAGE_SIZE,
+	PLAY_CSV_HEADERS,
 	readHistoryQuery,
 	historyHref,
 	statHref,
@@ -13,7 +15,9 @@ import {
 	sessionText,
 	workText,
 	performersText,
-	jigiText
+	jigiText,
+	fetchAllPlays,
+	playCsvRow
 } from '../../src/lib/playHistory.js';
 
 const read = (search) => readHistoryQuery(new URLSearchParams(search));
@@ -247,4 +251,131 @@ test('a play without music or performers still reads', () => {
 	assert.equal(jigiText(bare), '');
 	assert.equal(workText({ ...bare, music_title: '무제' }), '무제');
 	assert.equal(performersText({ ...bare, player_names: [] }), '');
+});
+
+test('the CSV export asks for the largest page plays/ allows', () => {
+	assert.equal(EXPORT_PAGE_SIZE, 100);
+	const exported = Object.fromEntries(
+		playsParams({ ...DEFAULT, q: '현악' }, CURRENT_RANGE, 200, EXPORT_PAGE_SIZE)
+	);
+	assert.deepEqual(exported, {
+		start: '2026-09-01',
+		end: '2026-10-27',
+		q: '현악',
+		limit: '100',
+		offset: '200'
+	});
+	assert.equal(params({}).limit, String(PAGE_SIZE));
+});
+
+// 가짜 plays/: offset 부터 limit 개. shiftAt 번째 요청 앞에 새 선곡 하나가 맨 앞에 들어온다.
+function fakePlays(total, { limit = 3, shiftAt = -1, emptyAt = -1 } = {}) {
+	let plays = Array.from({ length: total }, (_, i) => ({ id: total - i }));
+	const calls = [];
+	const fetchPage = async (offset) => {
+		calls.push(offset);
+		if (calls.length - 1 === shiftAt) plays = [{ id: total + 1 }, ...plays];
+		if (calls.length - 1 === emptyAt) return { count: plays.length, results: [] };
+		return { count: plays.length, results: plays.slice(offset, offset + limit) };
+	};
+	return { fetchPage, calls };
+}
+
+test('the CSV export pages through every play once', async () => {
+	const { fetchPage, calls } = fakePlays(7);
+	const progress = [];
+	const rows = await fetchAllPlays(fetchPage, (done, count) => progress.push([done, count]));
+	assert.deepEqual(
+		rows.map((r) => r.id),
+		[7, 6, 5, 4, 3, 2, 1]
+	);
+	assert.deepEqual(calls, [0, 3, 6]);
+	assert.deepEqual(progress, [
+		[3, 7],
+		[6, 7],
+		[7, 7]
+	]);
+});
+
+test('the CSV export keeps a play once when a new play shifts the pages', async () => {
+	const { fetchPage, calls } = fakePlays(7, { shiftAt: 1 });
+	const rows = await fetchAllPlays(fetchPage);
+	// 두 번째 쪽은 3번 선곡부터가 아니라 다시 5번(밀린 자리)부터 온다.
+	assert.deepEqual(
+		rows.map((r) => r.id),
+		[7, 6, 5, 4, 3, 2, 1]
+	);
+	assert.deepEqual(calls, [0, 3, 6]);
+});
+
+test('the CSV export stops at an empty page or with no plays', async () => {
+	const early = fakePlays(7, { emptyAt: 1 });
+	assert.deepEqual(
+		(await fetchAllPlays(early.fetchPage)).map((r) => r.id),
+		[7, 6, 5]
+	);
+	assert.deepEqual(early.calls, [0, 3]);
+	const none = fakePlays(0);
+	assert.deepEqual(await fetchAllPlays(none.fetchPage), []);
+	assert.deepEqual(none.calls, [0]);
+});
+
+test('the CSV export fails as a whole when a page fails', async () => {
+	let n = 0;
+	const fetchPage = async (offset) => {
+		if (++n === 2) throw new Error('plays 502');
+		return { count: 6, results: [{ id: 6 - offset }, { id: 5 - offset }, { id: 4 - offset }] };
+	};
+	await assert.rejects(fetchAllPlays(fetchPage), /plays 502/);
+});
+
+test('a play is one CSV row, one column per header', () => {
+	const play = {
+		id: 3,
+		time_id: 2,
+		date: '2024-03-06',
+		time: 2,
+		is_requested: true,
+		music_title: '첼로 소나타 제1번',
+		music_semi_title: '2악장',
+		composer_name: '브람스',
+		player_names: ['피아노: 가상 피아니스트', '첼로: 가상 첼리스트'],
+		orchestra_name: '가상 오케스트라',
+		conductor_name: '가상 지휘자',
+		jigi_names: ['가상일', '가상이'],
+		mentee_names: ['가상사']
+	};
+	assert.deepEqual(PLAY_CSV_HEADERS, [
+		'날짜',
+		'타임',
+		'작곡가',
+		'곡',
+		'세부 제목',
+		'연주자',
+		'오케스트라',
+		'지휘자',
+		'지기',
+		'견습 지기',
+		'신청곡'
+	]);
+	assert.deepEqual(playCsvRow(play), [
+		'2024-03-06',
+		2,
+		'브람스',
+		'첼로 소나타 제1번',
+		'2악장',
+		'피아노: 가상 피아니스트, 첼로: 가상 첼리스트',
+		'가상 오케스트라',
+		'가상 지휘자',
+		'가상일, 가상이',
+		'가상사',
+		'O'
+	]);
+	const bare = { id: 1, time_id: 1, date: '2026-10-23', time: 3, is_requested: false };
+	const row = playCsvRow(bare);
+	assert.equal(row.length, PLAY_CSV_HEADERS.length);
+	assert.deepEqual(
+		row.map((cell) => cell ?? ''),
+		['2026-10-23', 3, '', '', '', '', '', '', '', '', '']
+	);
 });
