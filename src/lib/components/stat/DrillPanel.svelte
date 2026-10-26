@@ -12,6 +12,7 @@
 	export let error = '';
 	export let scopeLabel = '';
 	export let historyLink = ''; // 같은 기간·범위·대상의 선곡 기록
+	export let composerLink = ''; // 작곡가면 그 작곡가 페이지
 
 	const dispatch = createEventDispatcher();
 	let panel;
@@ -39,6 +40,9 @@
 
 <section class="drill-panel" aria-label={title} tabindex="-1" bind:this={panel}>
 	<div class="actions">
+		{#if composerLink}
+			<a class="history-link" href={composerLink}>작곡가 페이지</a>
+		{/if}
 		{#if historyLink && works && works.total_plays > 0}
 			<a class="history-link" href={historyLink}>
 				{works.total_plays.toLocaleString()}곡 모두 보기

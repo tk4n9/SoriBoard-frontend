@@ -31,6 +31,7 @@
 		currentSemesterRange
 	} from '$lib/statPeriod.js';
 	import { historyHref } from '$lib/playHistory.js';
+	import { composerHref } from '$lib/composerStats.js';
 
 	// 범위·지기·견습 포함·기간은 URL에도 둔다(링크로 같은 보기를 연다). 페이지가 시작될 때 한 번만 읽는다.
 	const initial = readStatQuery($page.url.searchParams);
@@ -492,6 +493,7 @@
 					error={drillError}
 					{scopeLabel}
 					historyLink={drillHistoryLink}
+					composerLink={drill.card === 'composers' ? composerHref(drill.id) : ''}
 					on:close={closeDrill}
 				/>
 			{/key}
