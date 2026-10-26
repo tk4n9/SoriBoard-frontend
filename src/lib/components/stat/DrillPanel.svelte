@@ -11,6 +11,7 @@
 	export let loading = false;
 	export let error = '';
 	export let scopeLabel = '';
+	export let historyLink = ''; // 같은 기간·범위·대상의 선곡 기록
 
 	const dispatch = createEventDispatcher();
 	let panel;
@@ -37,9 +38,16 @@
 </script>
 
 <section class="drill-panel" aria-label={title} tabindex="-1" bind:this={panel}>
-	<button class="tool-btn close" on:click={() => dispatch('close')} aria-label={`${title} 닫기`}>
-		닫기
-	</button>
+	<div class="actions">
+		{#if historyLink && works && works.total_plays > 0}
+			<a class="history-link" href={historyLink}>
+				{works.total_plays.toLocaleString()}곡 모두 보기
+			</a>
+		{/if}
+		<button class="tool-btn" on:click={() => dispatch('close')} aria-label={`${title} 닫기`}>
+			닫기
+		</button>
+	</div>
 	{#if !loading && !error && table}
 		<DataTable {table} {title} {subtitle} />
 	{:else}
@@ -79,11 +87,21 @@
 	.tool-btn:hover {
 		background: var(--secondary-secondary-200, #fdf1e4);
 	}
-	.close {
+	.actions {
 		position: absolute;
 		top: 12px;
 		right: 12px;
 		z-index: 2;
+		display: flex;
+		align-items: center;
+		gap: 12px;
+	}
+	/* 통계 머리말의 '선곡 기록' 링크와 같은 모양 */
+	.history-link {
+		font-family: var(--small-medium-font-family, 'Noto Sans KR', sans-serif);
+		font-size: var(--small-medium-font-size, 13px);
+		color: var(--primary-primary-800, #6a5134);
+		text-underline-offset: 3px;
 	}
 	/* DataTable 의 제목·부제와 같은 글꼴·색 */
 	.panel-title {

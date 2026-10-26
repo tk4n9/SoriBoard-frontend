@@ -1,5 +1,5 @@
 <script>
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import PeriodSelect from '$lib/components/stat/PeriodSelect.svelte';
@@ -11,10 +11,14 @@
 		historyHref,
 		statHref,
 		playsParams,
-		appendPage
+		appendPage,
+		targetLookup,
+		targetName,
+		targetText
 	} from '$lib/playHistory.js';
 
-	// 검색어·기간·지기·신청곡은 URL에 둔다(링크로 같은 목록을 연다). 페이지가 시작될 때 한 번만 읽는다.
+	// 검색어·기간·지기·신청곡과 통계 drill-down 의 id 필터는 URL에 둔다(링크로 같은 목록을 연다).
+	// 페이지가 시작될 때 한 번만 읽는다.
 	const initial = readHistoryQuery($page.url.searchParams);
 	let period = initial.period; // 'current' | 'all' | 'custom' | 학기 id
 	let customStart = initial.start;
@@ -24,6 +28,9 @@
 	let userId = initial.userId;
 	let includeMentees = initial.includeMentees;
 	let requested = initial.requested; // '' | 'true' | 'false'
+	let target = initial.target; // 작곡가·연주자·지휘자·오케스트라 하나(id), 없으면 null
+	let targetLabel = target && targetText(target, null); // 이름을 찾으면 바꾼다
+	let searchInput;
 	const current = currentSemesterRange();
 
 	const filter = () => ({
@@ -33,7 +40,8 @@
 		q,
 		userId,
 		includeMentees,
-		requested
+		requested,
+		target
 	});
 
 	/** @type {import('$lib/playHistory.js').Play[]} */
@@ -77,7 +85,25 @@
 		load();
 	}
 
-	onMount(() => load());
+	// id 필터의 이름은 URL에 없으므로 그 대상의 순위에서 id 로 찾는다(실패하면 '작곡가 #id').
+	async function loadTargetName() {
+		const wanted = target;
+		const lookup = targetLookup(wanted);
+		if (!wanted || !lookup) return;
+		try {
+			const res = await fetch(`/api/stats/${lookup.endpoint}?${lookup.params}`);
+			if (!res.ok) throw new Error(`${lookup.endpoint} ${res.status}`);
+			const name = targetName(await res.json(), wanted);
+			if (target === wanted) targetLabel = targetText(wanted, name);
+		} catch (e) {
+			console.error('선곡 기록 대상 이름 로딩 실패', e);
+		}
+	}
+
+	onMount(() => {
+		load();
+		loadTargetName();
+	});
 
 	function onSearch() {
 		q = query.trim();
@@ -96,6 +122,13 @@
 	function onRequestedChange(e) {
 		requested = e.target.value;
 		apply();
+	}
+	// 해제하면 단추가 사라지므로 포커스를 검색란으로 옮긴다.
+	async function clearTarget() {
+		target = null;
+		apply();
+		await tick();
+		searchInput.focus();
 	}
 
 	$: periodText =
@@ -134,12 +167,21 @@
 			<input
 				type="search"
 				bind:value={query}
+				bind:this={searchInput}
 				placeholder="작곡가, 곡, 연주자, 지휘자, 오케스트라"
 				aria-label="선곡 검색"
 			/>
 			<button type="submit">검색</button>
 		</form>
 		<div class="filters">
+			{#if target}
+				<span class="target">
+					{targetLabel}
+					<button class="tool-btn" on:click={clearTarget} aria-label={`${targetLabel} 필터 해제`}>
+						해제
+					</button>
+				</span>
+			{/if}
 			<PeriodSelect
 				bind:period
 				bind:start={customStart}
@@ -280,6 +322,19 @@
 	.search button:hover,
 	.tool-btn:hover {
 		background: var(--secondary-secondary-200, #fdf1e4);
+	}
+	/* 통계 drill-down 에서 온 id 필터: 입력란과 같은 테두리 */
+	.target {
+		display: inline-flex;
+		align-items: center;
+		gap: 8px;
+		padding: 4px 6px 4px 10px;
+		border: 1px solid var(--control-border);
+		border-radius: 6px;
+		background: var(--secondary-secondary-50, #fffdfc);
+		font-family: var(--medium-font-family, 'Noto Sans KR', sans-serif);
+		font-size: var(--small-medium-font-size, 13px);
+		color: var(--gray-gray-950, #1a1a1a);
 	}
 	.tool-btn:disabled {
 		cursor: default;

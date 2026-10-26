@@ -312,7 +312,7 @@
 		]);
 	$: pct = (v) => (v == null ? '—' : `${Math.round(v * 100)}%`);
 	// 머리말의 '선곡 기록' 링크: 같은 기간과(개인 범위면) 같은 지기의 선곡 목록.
-	$: historyLink = historyHref({
+	$: historyFilter = {
 		period,
 		start: customStart,
 		end: customEnd,
@@ -320,7 +320,12 @@
 		userId: scope === 'individual' ? userId : null,
 		includeMentees,
 		requested: ''
-	});
+	};
+	$: historyLink = historyHref(historyFilter);
+	// drill-down 패널의 'N곡 모두 보기': stats/works 에 보낸 것과 같은 기간·지기·id 필터.
+	$: drillHistoryLink =
+		drill &&
+		historyHref({ ...historyFilter, target: { param: drill.param, id: String(drill.id) } });
 </script>
 
 <div class="stat-page">
@@ -486,6 +491,7 @@
 					loading={drillLoading}
 					error={drillError}
 					{scopeLabel}
+					historyLink={drillHistoryLink}
 					on:close={closeDrill}
 				/>
 			{/key}
