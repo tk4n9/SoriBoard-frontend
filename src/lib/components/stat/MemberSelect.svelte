@@ -3,6 +3,8 @@
 
 	export let userId = null;
 	export let includeMentees = false;
+	// 지기를 고르지 않은 때의 항목 이름(선곡 기록에서는 '전체 지기').
+	export let emptyLabel = '지기 선택';
 
 	const dispatch = createEventDispatcher();
 	let users = [];
@@ -30,7 +32,7 @@
 
 <div class="member-select">
 	<select on:change={onUserChange} value={userId ?? ''} aria-label="지기">
-		<option value="">지기 선택</option>
+		<option value="">{emptyLabel}</option>
 		{#each users as user}
 			<option value={String(user.id)}>{user.name} {user.major} {user.year_id}</option>
 		{/each}

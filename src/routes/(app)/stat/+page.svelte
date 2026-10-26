@@ -30,6 +30,7 @@
 		periodRangeText,
 		currentSemesterRange
 	} from '$lib/statPeriod.js';
+	import { historyHref } from '$lib/playHistory.js';
 
 	// 범위·지기·견습 포함·기간은 URL에도 둔다(링크로 같은 보기를 연다). 페이지가 시작될 때 한 번만 읽는다.
 	const initial = readStatQuery($page.url.searchParams);
@@ -310,6 +311,16 @@
 			{ name: '장르 다양성', values: diversity.timeline.genre_evenness, format: formatEvenness }
 		]);
 	$: pct = (v) => (v == null ? '—' : `${Math.round(v * 100)}%`);
+	// 머리말의 '선곡 기록' 링크: 같은 기간과(개인 범위면) 같은 지기의 선곡 목록.
+	$: historyLink = historyHref({
+		period,
+		start: customStart,
+		end: customEnd,
+		q: '',
+		userId: scope === 'individual' ? userId : null,
+		includeMentees,
+		requested: ''
+	});
 </script>
 
 <div class="stat-page">
@@ -317,6 +328,7 @@
 		<div class="title-group">
 			<h1>통계</h1>
 			<span class="period">{periodText}</span>
+			<a class="history-link" href={historyLink}>선곡 기록</a>
 		</div>
 		<div class="controls">
 			<PeriodSelect
@@ -571,6 +583,12 @@
 		font-family: var(--small-medium-font-family, 'Noto Sans KR', sans-serif);
 		font-size: var(--small-medium-font-size, 13px);
 		color: var(--gray-gray-600, #7c7c7c);
+	}
+	.history-link {
+		font-family: var(--small-medium-font-family, 'Noto Sans KR', sans-serif);
+		font-size: var(--small-medium-font-size, 13px);
+		color: var(--primary-primary-800, #6a5134);
+		text-underline-offset: 3px;
 	}
 	.controls {
 		display: flex;
