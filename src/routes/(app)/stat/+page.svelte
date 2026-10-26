@@ -356,6 +356,19 @@
 				<div class="kpi-value">{summary ? summary.total_plays.toLocaleString() : '—'}</div>
 				<div class="kpi-label">총 선곡</div>
 			</div>
+			<!-- sessions·requested 가 없는 예전 백엔드에서는 '—' -->
+			<div class="kpi">
+				<div class="kpi-value">
+					{summary && summary.sessions != null ? summary.sessions.toLocaleString() : '—'}
+				</div>
+				<div class="kpi-label">타임</div>
+			</div>
+			<div class="kpi">
+				<div class="kpi-value">
+					{summary && summary.requested != null ? summary.requested.toLocaleString() : '—'}
+				</div>
+				<div class="kpi-label">신청곡</div>
+			</div>
 			<div class="kpi">
 				<div class="kpi-value">{summary ? summary.composers.toLocaleString() : '—'}</div>
 				<div class="kpi-label">작곡가</div>
@@ -374,7 +387,13 @@
 			</div>
 			<div class="kpi span2">
 				<div class="kpi-value small">
-					{summary && summary.date_start ? `${summary.date_start} ~ ${summary.date_end}` : '—'}
+					<!-- 좁은 칸에서는 '~' 뒤에서만 줄을 바꾼다 -->
+					{#if summary && summary.date_start}
+						<span class="date">{summary.date_start}</span> ~
+						<span class="date">{summary.date_end}</span>
+					{:else}
+						—
+					{/if}
 				</div>
 				<div class="kpi-label">기간</div>
 			</div>
@@ -581,7 +600,7 @@
 	}
 	.kpi-row {
 		display: grid;
-		grid-template-columns: repeat(7, 1fr);
+		grid-template-columns: repeat(9, 1fr);
 		gap: 12px;
 		margin-bottom: 20px;
 	}
@@ -603,6 +622,9 @@
 	}
 	.kpi-value.small {
 		font-size: var(--medium-font-size, 16px);
+	}
+	.kpi-value .date {
+		white-space: nowrap;
 	}
 	.kpi-label {
 		margin-top: 4px;
