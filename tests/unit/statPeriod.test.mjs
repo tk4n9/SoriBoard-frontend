@@ -3,12 +3,16 @@ import assert from 'node:assert/strict';
 import {
 	CURRENT,
 	ALL,
+	CUSTOM,
 	readStatPeriod,
+	readStatRange,
 	writeStatPeriod,
 	sortSemesters,
 	semesterLabel,
 	knownPeriod,
-	periodRangeText
+	periodRangeText,
+	isIsoDate,
+	rangeError
 } from '../../src/lib/statPeriod.js';
 
 const read = (search) => readStatPeriod(new URLSearchParams(search));
@@ -102,6 +106,7 @@ test('a 학기 that is not in the list falls back to 이번 학기', () => {
 	assert.equal(knownPeriod('9', []), CURRENT);
 	assert.equal(knownPeriod(CURRENT, []), CURRENT);
 	assert.equal(knownPeriod(ALL, []), ALL);
+	assert.equal(knownPeriod(CUSTOM, []), CUSTOM);
 });
 
 test('the header shows the range the backend applied', () => {
@@ -115,4 +120,115 @@ test('the header shows the range the backend applied', () => {
 	assert.equal(periodRangeText({ user_id: '2', include_mentees: true }), '전체 기간');
 	assert.equal(periodRangeText({ start: '2025-03-01' }), '2025-03-01 ~');
 	assert.equal(periodRangeText({ end: '2025-08-31' }), '~ 2025-08-31');
+});
+
+test('the header shows a 직접 지정 range with an open end', () => {
+	assert.equal(periodRangeText({ start: '2025-03-01', end: '' }), '2025-03-01 ~');
+	assert.equal(periodRangeText({ start: '', end: '2025-08-31' }), '~ 2025-08-31');
+});
+
+test('a linked start/end reads as 직접 지정', () => {
+	assert.equal(read('start=2025-03-10&end=2025-05-31'), CUSTOM);
+	assert.equal(read('start=2025-03-10'), CUSTOM);
+	assert.equal(read('end=2025-05-31&scope=individual&user_id=2'), CUSTOM);
+	assert.deepEqual(readStatRange(new URLSearchParams('start=2025-03-10&end=2025-05-31')), {
+		start: '2025-03-10',
+		end: '2025-05-31'
+	});
+	assert.deepEqual(readStatRange(new URLSearchParams('end=2025-05-31')), {
+		start: '',
+		end: '2025-05-31'
+	});
+	assert.deepEqual(readStatRange(new URLSearchParams('')), { start: '', end: '' });
+});
+
+test('a 학기 wins over dates, and dates win over period=all', () => {
+	assert.equal(read('semester_id=1&start=2025-03-01'), '1');
+	assert.equal(read('period=all&end=2025-06-30'), CUSTOM);
+	assert.equal(read('period=all&start=nope'), ALL);
+});
+
+test('bad or backwards linked dates are ignored', () => {
+	for (const raw of [
+		'2025-02-30',
+		'2025-13-01',
+		'20250301',
+		'2025-3-1',
+		'2025-03-01T00:00',
+		'x',
+		''
+	]) {
+		assert.equal(read(`start=${encodeURIComponent(raw)}`), CURRENT, raw);
+		assert.equal(readStatRange(new URLSearchParams(`start=${encodeURIComponent(raw)}`)).start, '');
+	}
+	assert.equal(read('start=2025-06-01&end=2025-03-01'), CURRENT);
+	assert.equal(read('start=2025-06-01&end=2025-03-01&period=all'), ALL);
+	// One good date is kept even if the other is malformed.
+	assert.equal(read('start=2025-06-01&end=garbage'), CUSTOM);
+});
+
+test('직접 지정 writes only the dates it has', () => {
+	const writeRange = (search, range) => {
+		const params = new URLSearchParams(search);
+		writeStatPeriod(params, CUSTOM, range);
+		return params.toString();
+	};
+	assert.equal(
+		writeRange('semester_id=4', { start: '2025-03-01', end: '2025-06-30' }),
+		'start=2025-03-01&end=2025-06-30'
+	);
+	assert.equal(writeRange('period=all', { start: '2025-03-01', end: '' }), 'start=2025-03-01');
+	assert.equal(
+		writeRange('scope=individual&user_id=2', { start: '', end: '2025-06-30' }),
+		'scope=individual&user_id=2&end=2025-06-30'
+	);
+	// Other periods drop the dates.
+	assert.equal(write('start=2025-03-01&end=2025-06-30', CURRENT), '');
+	assert.equal(write('start=2025-03-01', ALL), 'period=all');
+	assert.equal(write('end=2025-06-30', '4'), 'semester_id=4');
+});
+
+test('a written range reads back the same', () => {
+	for (const range of [
+		{ start: '2025-03-01', end: '2025-06-30' },
+		{ start: '2024-02-29', end: '' },
+		{ start: '', end: '2025-12-31' },
+		{ start: '2025-05-05', end: '2025-05-05' }
+	]) {
+		const params = new URLSearchParams('scope=individual');
+		writeStatPeriod(params, CUSTOM, range);
+		assert.equal(readStatPeriod(params), CUSTOM);
+		assert.deepEqual(readStatRange(params), range);
+	}
+});
+
+test('only real calendar dates count', () => {
+	assert.ok(isIsoDate('2024-02-29'));
+	assert.ok(isIsoDate('2025-12-31'));
+	assert.ok(!isIsoDate('2025-02-29'));
+	assert.ok(!isIsoDate('2025-04-31'));
+	assert.ok(!isIsoDate('2025-00-10'));
+	assert.ok(!isIsoDate('2025-01-00'));
+	assert.ok(!isIsoDate(' 2025-01-01'));
+	assert.ok(!isIsoDate(''));
+});
+
+test('the box refuses an empty or backwards range', () => {
+	assert.equal(rangeError({ start: '2025-03-01', end: '2025-06-30' }), '');
+	assert.equal(rangeError({ start: '2025-03-01', end: '2025-03-01' }), '');
+	assert.equal(rangeError({ start: '2025-03-01', end: '' }), '');
+	assert.equal(rangeError({ start: '', end: '2025-06-30' }), '');
+	assert.equal(
+		rangeError({ start: '2025-07-01', end: '2025-06-30' }),
+		'시작일이 종료일보다 늦습니다.'
+	);
+	assert.equal(rangeError({ start: '', end: '' }), '시작일이나 종료일을 넣어 주세요.');
+	assert.equal(
+		rangeError({ start: '2025/03/01', end: '' }),
+		'날짜를 YYYY-MM-DD 형식으로 넣어 주세요.'
+	);
+	assert.equal(
+		rangeError({ start: '2025-03-01', end: '2025-02-30' }),
+		'날짜를 YYYY-MM-DD 형식으로 넣어 주세요.'
+	);
 });

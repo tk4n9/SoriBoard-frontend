@@ -17,7 +17,9 @@
 	import {
 		CURRENT,
 		ALL,
+		CUSTOM,
 		readStatPeriod,
+		readStatRange,
 		writeStatPeriod,
 		periodRangeText
 	} from '$lib/statPeriod.js';
@@ -27,12 +29,15 @@
 	let scope = initial.scope;
 	let userId = initial.userId;
 	let includeMentees = initial.includeMentees;
-	let period = readStatPeriod($page.url.searchParams); // 'current' | 'all' | 학기 id
+	let period = readStatPeriod($page.url.searchParams); // 'current' | 'all' | 'custom' | 학기 id
+	// 직접 지정 범위(YYYY-MM-DD, 빈 값 = 그쪽이 열림).
+	let { start: customStart, end: customEnd } =
+		period === CUSTOM ? readStatRange($page.url.searchParams) : { start: '', end: '' };
 
 	// 보기가 바뀌면 URL을 바꾼다. 히스토리를 쌓지 않고, 포커스·스크롤도 그대로 둔다.
 	function syncUrl() {
 		const url = new URL($page.url);
-		writeStatPeriod(url.searchParams, period);
+		writeStatPeriod(url.searchParams, period, { start: customStart, end: customEnd });
 		goto(statQueryHref(url, { scope, userId, includeMentees }), {
 			replaceState: true,
 			keepFocus: true,
@@ -79,6 +84,9 @@
 		if (period === CURRENT) {
 			if (startDate) params.set('start', startDate);
 			if (endDate) params.set('end', endDate);
+		} else if (period === CUSTOM) {
+			if (customStart) params.set('start', customStart);
+			if (customEnd) params.set('end', customEnd);
 		} else if (period !== ALL) {
 			params.set('semester_id', period);
 		}
@@ -166,7 +174,14 @@
 			? `${startDate} ~ ${endDate}`
 			: period === ALL
 				? '전체 기간'
-				: '';
+				: period === CUSTOM
+					? periodRangeText({ start: customStart, end: customEnd })
+					: '';
+	// 직접 지정을 고르면 입력란에 지금 보이는 기간을 채운다(전체 기간이면 이번 학기).
+	$: shownRange =
+		appliedFilters && (appliedFilters.start || appliedFilters.end)
+			? { start: appliedFilters.start ?? '', end: appliedFilters.end ?? '' }
+			: { start: startDate, end: endDate };
 	$: subtitleFor = (envelope) =>
 		envelope ? `${scopeLabel} · 총 ${envelope.total_plays.toLocaleString()}곡` : '';
 
@@ -219,7 +234,13 @@
 			<span class="period">{periodText}</span>
 		</div>
 		<div class="controls">
-			<PeriodSelect bind:period on:change={onPeriodChange} />
+			<PeriodSelect
+				bind:period
+				bind:start={customStart}
+				bind:end={customEnd}
+				{shownRange}
+				on:change={onPeriodChange}
+			/>
 			<ScopeToggle bind:scope on:change={onScopeChange} />
 			{#if scope === 'individual'}
 				<MemberSelect bind:userId bind:includeMentees on:change={onMemberChange} />
