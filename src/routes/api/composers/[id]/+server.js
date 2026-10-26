@@ -16,3 +16,20 @@ export async function GET({ params, fetch }) {
 		return json({ message: 'Composer lookup unavailable' }, { status: 502 });
 	}
 }
+
+// 작곡가의 출생 연도·시대 보정(PATCH composers/<id>/). 백엔드의 상태와 본문(400 이면 칸별
+// 오류)을 그대로 돌려준다.
+export async function PATCH({ params, request, fetch }) {
+	if (!/^\d+$/.test(params.id)) return json({ message: 'Composer not found' }, { status: 404 });
+	try {
+		const response = await fetch(`${backendServer}/time_manage/composers/${params.id}/`, {
+			method: 'PATCH',
+			headers: { 'Content-Type': 'application/json' },
+			body: await request.text()
+		});
+		const body = await response.json().catch(() => ({ message: 'Composer update failed' }));
+		return json(body, { status: response.status });
+	} catch {
+		return json({ message: 'Composer update unavailable' }, { status: 502 });
+	}
+}
