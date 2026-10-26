@@ -5,6 +5,7 @@
 	import ChartCard from '$lib/components/stat/ChartCard.svelte';
 	import ScopeToggle from '$lib/components/stat/ScopeToggle.svelte';
 	import MemberSelect from '$lib/components/stat/MemberSelect.svelte';
+	import PeriodSelect from '$lib/components/stat/PeriodSelect.svelte';
 	import {
 		horizontalBarOption,
 		timelineOption,
@@ -13,16 +14,26 @@
 		diversityLineOption
 	} from '$lib/chartOptions.js';
 	import { readStatQuery, statQueryHref } from '$lib/statQuery.js';
+	import {
+		CURRENT,
+		ALL,
+		readStatPeriod,
+		writeStatPeriod,
+		periodRangeText
+	} from '$lib/statPeriod.js';
 
-	// 범위·지기·견습 포함은 URL에도 둔다(링크로 같은 보기를 연다). 페이지가 시작될 때 한 번만 읽는다.
+	// 범위·지기·견습 포함·기간은 URL에도 둔다(링크로 같은 보기를 연다). 페이지가 시작될 때 한 번만 읽는다.
 	const initial = readStatQuery($page.url.searchParams);
 	let scope = initial.scope;
 	let userId = initial.userId;
 	let includeMentees = initial.includeMentees;
+	let period = readStatPeriod($page.url.searchParams); // 'current' | 'all' | 학기 id
 
 	// 보기가 바뀌면 URL을 바꾼다. 히스토리를 쌓지 않고, 포커스·스크롤도 그대로 둔다.
 	function syncUrl() {
-		goto(statQueryHref($page.url, { scope, userId, includeMentees }), {
+		const url = new URL($page.url);
+		writeStatPeriod(url.searchParams, period);
+		goto(statQueryHref(url, { scope, userId, includeMentees }), {
 			replaceState: true,
 			keepFocus: true,
 			noScroll: true
@@ -59,12 +70,18 @@
 	let diversity = null;
 	let timelineBucket = 'month';
 	let diversityBucket = 'month'; // 'week' | 'month'
+	// 백엔드가 적용했다고 돌려준 기간(filters). 기간이 바뀔 때만 비운다.
+	let appliedFilters = null;
 
 	// 현재 필터를 쿼리스트링으로.
 	function buildQuery(extra = {}) {
 		const params = new URLSearchParams();
-		if (startDate) params.set('start', startDate);
-		if (endDate) params.set('end', endDate);
+		if (period === CURRENT) {
+			if (startDate) params.set('start', startDate);
+			if (endDate) params.set('end', endDate);
+		} else if (period !== ALL) {
+			params.set('semester_id', period);
+		}
 		if (scope === 'individual' && userId) {
 			params.set('user_id', userId);
 			if (includeMentees) params.set('include_mentees', 'true');
@@ -105,6 +122,7 @@
 			if (id !== loadId) return;
 			[summary, composers, soloists, conductors, orchestras, timeline, eras, genres, diversity] =
 				results;
+			appliedFilters = summary.filters;
 		} catch (e) {
 			if (id !== loadId) return;
 			console.error('통계 로딩 실패', e);
@@ -127,6 +145,12 @@
 		syncUrl();
 		loadAll();
 	}
+	function onPeriodChange(e) {
+		period = e.detail;
+		appliedFilters = null;
+		syncUrl();
+		loadAll();
+	}
 	function setDiversityBucket(b) {
 		if (diversityBucket === b) return;
 		diversityBucket = b;
@@ -135,6 +159,14 @@
 
 	// 부제: 현재 범위 + 전체 선곡 수.
 	$: scopeLabel = scope === 'individual' ? '개인' : '전체';
+	// 머리말 기간: 백엔드가 돌려준 범위. 아직 없으면 보낼 범위로 짐작한다.
+	$: periodText = appliedFilters
+		? periodRangeText(appliedFilters)
+		: period === CURRENT
+			? `${startDate} ~ ${endDate}`
+			: period === ALL
+				? '전체 기간'
+				: '';
 	$: subtitleFor = (envelope) =>
 		envelope ? `${scopeLabel} · 총 ${envelope.total_plays.toLocaleString()}곡` : '';
 
@@ -184,9 +216,10 @@
 	<header class="page-header">
 		<div class="title-group">
 			<h1>통계</h1>
-			<span class="period">{startDate} ~ {endDate} (이번 학기)</span>
+			<span class="period">{periodText}</span>
 		</div>
 		<div class="controls">
+			<PeriodSelect bind:period on:change={onPeriodChange} />
 			<ScopeToggle bind:scope on:change={onScopeChange} />
 			{#if scope === 'individual'}
 				<MemberSelect bind:userId bind:includeMentees on:change={onMemberChange} />
