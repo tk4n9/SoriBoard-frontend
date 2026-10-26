@@ -1,7 +1,8 @@
 <script>
-	import { sessionText, workText, performersText, jigiText } from '$lib/playHistory.js';
+	import { sessionText, workText, workParts, performersText, jigiText } from '$lib/playHistory.js';
+	import { composerHref } from '$lib/composerStats.js';
 
-	// 선곡 기록의 결과 표. 날짜·타임은 그 타임 화면으로 가는 링크다.
+	// 선곡 기록의 결과 표. 날짜·타임은 그 타임 화면으로, 작곡가는 그 작곡가 페이지로 가는 링크다.
 	/** @type {import('$lib/playHistory.js').Play[]} */
 	export let rows = [];
 	export let label = '선곡 기록';
@@ -19,12 +20,23 @@
 	</thead>
 	<tbody>
 		{#each rows as play (play.id)}
+			{@const work = workParts(play)}
 			<tr>
 				<th scope="row" class="session">
 					<a href={`/time_manage/${play.time_id}`} title="이 타임 열기">{sessionText(play)}</a>
 				</th>
 				<td>
-					<div class:missing={!play.composer_name && !play.music_title}>{workText(play)}</div>
+					{#if work.composer || work.title}
+						<div>
+							{#if work.composerId}<a
+									class="composer"
+									href={composerHref(work.composerId)}
+									title="이 작곡가 페이지 열기">{work.composer}</a
+								>{:else}{work.composer}{/if}{#if work.composer && work.title}{' - '}{/if}{work.title}
+						</div>
+					{:else}
+						<div class="missing">{workText(play)}</div>
+					{/if}
 					{#if play.music_semi_title}
 						<div class="semi">{play.music_semi_title}</div>
 					{/if}
@@ -70,12 +82,14 @@
 		white-space: nowrap;
 		font-variant-numeric: tabular-nums;
 	}
-	.session a {
+	.session a,
+	.composer {
 		color: inherit;
 		text-decoration-color: var(--gray-gray-500, #656667);
 		text-underline-offset: 3px;
 	}
-	.session a:hover {
+	.session a:hover,
+	.composer:hover {
 		text-decoration-thickness: 2px;
 	}
 	.semi {

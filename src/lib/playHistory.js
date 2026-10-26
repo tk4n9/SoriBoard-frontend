@@ -199,7 +199,8 @@ export async function fetchAllPlays(fetchPage, onProgress = () => {}) {
 }
 
 /** @typedef {{ id: number, time_id: number, date: string, time: number, is_requested: boolean,
- *   composer_name?: string, music_title?: string, music_semi_title?: string,
+ *   composer_id?: number | null, composer_name?: string, music_title?: string,
+ *   music_semi_title?: string,
  *   conductor_name?: string, orchestra_name?: string, player_names?: string[],
  *   jigi_names?: string[], mentee_names?: string[] }} Play */
 
@@ -211,6 +212,16 @@ export const sessionText = (play) => `${play.date} ${play.time}타임`;
 export function workText(play) {
 	const parts = [play.composer_name, play.music_title].filter(Boolean);
 	return parts.length ? parts.join(' - ') : '곡 정보 없음';
+}
+
+// workText 의 두 부분. 작곡가 id 가 있으면 표가 작곡가 이름을 그 작곡가 페이지로 잇는다.
+/** @param {Play} play */
+export function workParts(play) {
+	const composer = play.composer_name || '';
+	const id = play.composer_id;
+	const composerId =
+		composer && typeof id === 'number' && Number.isSafeInteger(id) && id > 0 ? id : null;
+	return { composer, composerId, title: play.music_title || '' };
 }
 
 // 연주자('악기: 이름'), 오케스트라, '지휘: 이름'. 없으면 ''.

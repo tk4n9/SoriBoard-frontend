@@ -14,6 +14,7 @@ import {
 	targetText,
 	sessionText,
 	workText,
+	workParts,
 	performersText,
 	jigiText,
 	fetchAllPlays,
@@ -251,6 +252,45 @@ test('a play without music or performers still reads', () => {
 	assert.equal(jigiText(bare), '');
 	assert.equal(workText({ ...bare, music_title: '무제' }), '무제');
 	assert.equal(performersText({ ...bare, player_names: [] }), '');
+});
+
+test('a play splits into a composer, linked by id, and a title', () => {
+	const play = {
+		id: 3,
+		time_id: 2,
+		date: '2024-03-06',
+		time: 2,
+		is_requested: false,
+		composer_id: 7,
+		composer_name: '브람스',
+		music_title: '첼로 소나타 제1번'
+	};
+	const joined = (parts) => [parts.composer, parts.title].filter(Boolean).join(' - ');
+	assert.deepEqual(workParts(play), {
+		composer: '브람스',
+		composerId: 7,
+		title: '첼로 소나타 제1번'
+	});
+	assert.equal(joined(workParts(play)), workText(play));
+
+	// No id, or not a usable one: the name stays plain text.
+	for (const composer_id of [undefined, null, 0, -1, 1.5, '7', Number.MAX_SAFE_INTEGER + 1]) {
+		assert.equal(workParts({ ...play, composer_id }).composerId, null, String(composer_id));
+	}
+	// An id without a name has nothing to link.
+	assert.deepEqual(workParts({ ...play, composer_name: '' }), {
+		composer: '',
+		composerId: null,
+		title: '첼로 소나타 제1번'
+	});
+	assert.deepEqual(workParts({ ...play, music_title: undefined }), {
+		composer: '브람스',
+		composerId: 7,
+		title: ''
+	});
+	assert.equal(joined(workParts({ ...play, music_title: undefined })), '브람스');
+	const bare = { id: 1, time_id: 1, date: '2026-10-23', time: 3, is_requested: false };
+	assert.deepEqual(workParts(bare), { composer: '', composerId: null, title: '' });
 });
 
 test('the CSV export asks for the largest page plays/ allows', () => {
