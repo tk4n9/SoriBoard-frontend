@@ -26,7 +26,14 @@
 	} from '$lib/statBucket.js';
 	import { rankTable, shareTable, seriesTable, formatEvenness } from '$lib/statTable.js';
 	import { seriesCsv } from '$lib/csvTable.js';
-	import { barItemIndex, drillTarget, drillParams } from '$lib/statDrill.js';
+	import {
+		barItemIndex,
+		drillTarget,
+		drillParams,
+		readDrillQuery,
+		writeDrillQuery,
+		drillItemIndex
+	} from '$lib/statDrill.js';
 	import {
 		CURRENT,
 		ALL,
@@ -41,7 +48,7 @@
 	import { composerHref } from '$lib/composerStats.js';
 	import { reportHref } from '$lib/semesterReport.js';
 
-	// 범위·지기·견습 포함·기간·주별/월별은 URL에도 둔다(링크로 같은 보기를 연다). 페이지가 시작될 때 한 번만 읽는다.
+	// 범위·지기·견습 포함·기간·주별/월별·열린 drill-down 패널은 URL에도 둔다(링크로 같은 보기를 연다). 페이지가 시작될 때 한 번만 읽는다.
 	const initial = readStatQuery($page.url.searchParams);
 	let scope = initial.scope;
 	let userId = initial.userId;
@@ -56,6 +63,7 @@
 		const url = new URL($page.url);
 		writeStatPeriod(url.searchParams, period, { start: customStart, end: customEnd });
 		writeDiversityBucket(url.searchParams, diversityBucket);
+		writeDrillQuery(url.searchParams, drill ?? linkedDrill);
 		goto(statQueryHref(url, { scope, userId, includeMentees }), {
 			replaceState: true,
 			keepFocus: true,
@@ -156,6 +164,7 @@
 						data[key] = pickCard[key] ? pickCard[key](result) : result;
 						// 모든 통계 응답이 적용된 기간(filters)을 돌려준다.
 						appliedFilters = result.filters;
+						openLinkedDrill(key);
 					}
 				} catch (e) {
 					const failed = latest();
@@ -182,6 +191,9 @@
 	let drillError = '';
 	/** @type {HTMLElement | null} */
 	let drillOpener = null; // 패널을 연 표의 단추. 닫으면 포커스를 돌려준다.
+	// URL로 연 패널(drill·drill_id): 그 카드가 처음 불러와지면 id 로 항목을 찾아 연다.
+	// 그 기간·범위의 항목에 없으면 이름을 알 수 없으므로 열지 않고 URL에서도 지운다.
+	let linkedDrill = readDrillQuery($page.url.searchParams);
 
 	async function loadDrill() {
 		if (!drill || (scope === 'individual' && !userId)) return;
@@ -206,8 +218,17 @@
 		if (!target) return;
 		const active = document.activeElement;
 		drillOpener = active instanceof HTMLElement && active.closest('.card') ? active : null;
+		linkedDrill = null; // 링크의 패널이 아직 열리지 않았으면, 지금 고른 것이 이긴다.
 		drill = target;
+		syncUrl();
 		loadDrill();
+	}
+	function openLinkedDrill(card) {
+		if (linkedDrill?.card !== card) return;
+		const index = drillItemIndex(data[card], linkedDrill.id);
+		linkedDrill = null;
+		if (index >= 0) openDrill(card, index);
+		else syncUrl();
 	}
 	// 막대는 1위가 맨 위에 오도록 뒤집혀 그려진다.
 	const openBar = (card, e) =>
@@ -216,6 +237,7 @@
 		requests.begin(['drill']); // 진행 중인 응답은 버린다.
 		drill = null;
 		drillWorks = null;
+		syncUrl();
 		await tick();
 		if (drillOpener?.isConnected) drillOpener.focus();
 		drillOpener = null;

@@ -58,3 +58,41 @@ export function workLabel(item, target) {
 		return item.name.slice(prefix.length);
 	return item.name;
 }
+
+// 열린 패널은 URL의 drill(카드)·drill_id 에 둔다(링크로 같은 패널을 연다). 이름은 싣지 않는다:
+// 링크로 열면 그 카드의 응답에서 id 로 항목을 찾는다(drillItemIndex). 형식이 틀린 값은 없음(null).
+const DRILL_KEYS = ['drill', 'drill_id'];
+const ID = /^[1-9]\d*$/;
+
+/**
+ * @param {URLSearchParams} params
+ * @returns {{ card: string, id: number } | null}
+ */
+export function readDrillQuery(params) {
+	const card = params.get('drill');
+	const raw = params.get('drill_id');
+	if (!card || !Object.keys(DRILL_CARDS).includes(card) || !raw || !ID.test(raw)) return null;
+	const id = Number(raw);
+	return Number.isSafeInteger(id) ? { card, id } : null;
+}
+
+// 패널이 없으면(null) 두 키를 지운다. 다른 파라미터는 그대로 둔다.
+/**
+ * @param {URLSearchParams} params
+ * @param {{ card: string, id: number } | null} target
+ */
+export function writeDrillQuery(params, target) {
+	for (const key of DRILL_KEYS) params.delete(key);
+	if (!target) return;
+	params.set('drill', target.card);
+	params.set('drill_id', String(target.id));
+}
+
+// 카드 응답의 items 에서 그 id 의 위치. 없으면 -1.
+/**
+ * @param {{ items?: { id: number | null }[] } | null | undefined} envelope
+ * @param {number} id
+ */
+export function drillItemIndex(envelope, id) {
+	return envelope?.items?.findIndex((item) => item.id === id) ?? -1;
+}
