@@ -91,12 +91,14 @@ export function semesterLabel(semester) {
 }
 
 // 학기 목록에 없는 학기 id 는 이번 학기로 읽는다(백엔드는 모르는 학기를 전체 기간으로 센다).
+// 목록을 받지 못했으면(배열이 아니면) 그대로 둔다.
 /**
  * @param {string} period
- * @param {{ id: number }[]} semesters
+ * @param {{ id: number }[] | null | undefined} semesters
  */
 export function knownPeriod(period, semesters) {
 	if (period === CURRENT || period === ALL || period === CUSTOM) return period;
+	if (!Array.isArray(semesters)) return period;
 	return semesters.some((s) => String(s.id) === period) ? period : CURRENT;
 }
 

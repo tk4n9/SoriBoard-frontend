@@ -110,6 +110,15 @@ test('a 학기 that is not in the list falls back to 이번 학기', () => {
 	assert.equal(knownPeriod(CUSTOM, []), CUSTOM);
 });
 
+test('a linked 학기 is kept when the 학기 list could not be loaded', () => {
+	assert.equal(knownPeriod('9', null), '9');
+	assert.equal(knownPeriod('9', undefined), '9');
+	assert.equal(knownPeriod('9', { message: 'Error' }), '9');
+	assert.equal(knownPeriod(CURRENT, null), CURRENT);
+	assert.equal(knownPeriod(ALL, null), ALL);
+	assert.equal(knownPeriod(CUSTOM, null), CUSTOM);
+});
+
 test('the header shows the range the backend applied', () => {
 	assert.equal(periodRangeText(null), '');
 	assert.equal(periodRangeText(undefined), '');

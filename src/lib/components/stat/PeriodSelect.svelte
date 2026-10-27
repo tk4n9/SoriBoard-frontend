@@ -25,15 +25,17 @@
 	let draftEnd = end;
 
 	onMount(async () => {
+		let loaded = false;
 		try {
 			const res = await fetch('/api/semester');
 			if (!res.ok) throw new Error(`Failed to fetch semesters: ${res.status}`);
 			semesters = sortSemesters(await res.json());
+			loaded = true;
 		} catch (e) {
 			console.error('학기 목록을 불러오지 못했습니다.', e);
 		}
-		// 링크의 학기가 목록에 없으면 이번 학기로 되돌린다.
-		const known = knownPeriod(period, semesters);
+		// 링크의 학기가 목록에 없으면 이번 학기로 되돌린다(목록을 못 받으면 그대로 둔다).
+		const known = knownPeriod(period, loaded ? semesters : null);
 		if (known !== period) {
 			period = known;
 			dispatch('change', period);
