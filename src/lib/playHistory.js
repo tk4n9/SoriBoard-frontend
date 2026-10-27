@@ -1,8 +1,8 @@
 // 선곡 기록(/stat/history): 필터와 URL 쿼리스트링, plays/ 요청 파라미터, 표의 문구 사이의 변환.
 // 기간은 통계 페이지와 같은 키(statPeriod.js)를 쓰므로, 통계의 링크가 그대로 같은 기간을 연다.
 // 그 밖에 q(검색어), user_id·include_mentees(지기, 없으면 전체), requested(true = 신청곡만,
-// false = 신청곡 제외), 그리고 통계 drill-down 의 id 필터 하나(composer_id, player_id,
-// conductor_id 또는 orchestra_id)를 둔다. 기본값은 URL에 남기지 않고, 형식이 틀린 값은 기본값으로 읽는다.
+// false = 신청곡 제외), 그리고 id 필터 하나(통계 drill-down 의 composer_id, player_id,
+// conductor_id, orchestra_id 또는 곡 하나의 music_id)를 둔다. 기본값은 URL에 남기지 않고, 형식이 틀린 값은 기본값으로 읽는다.
 import {
 	CURRENT,
 	ALL,
@@ -30,18 +30,22 @@ const LOOKUP_LIMIT = 100;
 /** @param {string | null} raw */
 const readId = (raw) => (raw && ID.test(raw) && Number.isSafeInteger(Number(raw)) ? raw : null);
 
+// id 필터가 걸러 내는 대상: drill-down 의 카드들과 곡(stats/works 의 music_id).
+/** @type {Record<string, { param: string, noun: string }>} */
+const TARGETS = { ...DRILL_CARDS, works: { param: 'music_id', noun: '곡' } };
+
 // id 필터 → 그 카드(stats/<card>)와 대상을 부르는 말.
 /** @param {HistoryTarget | null | undefined} target */
 const targetCard = (target) =>
-	target ? Object.entries(DRILL_CARDS).find(([, spec]) => spec.param === target.param) : undefined;
+	target ? Object.entries(TARGETS).find(([, spec]) => spec.param === target.param) : undefined;
 
-// URL의 id 필터. 여럿이면 DRILL_CARDS 순서로 처음 맞는 하나만 쓴다.
+// URL의 id 필터. 여럿이면 TARGETS 순서로 처음 맞는 하나만 쓴다.
 /**
  * @param {URLSearchParams} params
  * @returns {HistoryTarget | null}
  */
 function readTarget(params) {
-	for (const { param } of Object.values(DRILL_CARDS)) {
+	for (const { param } of Object.values(TARGETS)) {
 		const id = readId(params.get(param));
 		if (id) return { param, id };
 	}

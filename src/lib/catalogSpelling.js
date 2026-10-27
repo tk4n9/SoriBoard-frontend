@@ -10,8 +10,8 @@ import { ALL } from './statPeriod.js';
 export const SPELLING_VIEW = 'spelling';
 export const DEFAULT_KIND = 'composer';
 
-// catalog/duplicates/ 의 kind. param 은 선곡 기록이 그 대상을 거르는 id 필터(작곡가는 작곡가 페이지로,
-// 곡은 선곡 기록의 필터가 없어 그 작곡가로 잇는다).
+// catalog/duplicates/ 의 kind. param 은 선곡 기록이 그 대상을 거르는 id 필터(작곡가는 작곡가 페이지로
+// 잇는다).
 export const SPELLING_KINDS = [
 	{ kind: 'composer', label: '작곡가', empty: '표기가 갈린 작곡가가 없습니다', param: null },
 	{ kind: 'player', label: '연주자', empty: '표기가 갈린 연주자가 없습니다', param: 'player_id' },
@@ -27,7 +27,7 @@ export const SPELLING_KINDS = [
 		empty: '표기가 갈린 오케스트라가 없습니다',
 		param: 'orchestra_id'
 	},
-	{ kind: 'music', label: '곡', empty: '작품 번호가 같은 곡이 없습니다', param: null }
+	{ kind: 'music', label: '곡', empty: '작품 번호가 같은 곡이 없습니다', param: 'music_id' }
 ];
 
 /**
@@ -68,7 +68,8 @@ export function catalogViewHref(q, kind) {
 /** @param {string} kind */
 export const duplicatesSearch = (kind) => `?${new URLSearchParams({ kind })}`;
 
-// 한 행의 링크(이름으로 찾지 않고 id로): 이름 칸, 그리고 곡의 작곡가 칸. 없으면 null.
+// 한 행의 링크(이름으로 찾지 않고 id로): 이름 칸(그 표기의 선곡 기록), 그리고 곡의 작곡가 칸.
+// 없으면 null.
 /**
  * @param {string} kind
  * @param {SpellingRow} row
@@ -76,11 +77,9 @@ export const duplicatesSearch = (kind) => `?${new URLSearchParams({ kind })}`;
  */
 export function rowLinks(kind, row) {
 	if (kind === 'composer') return { name: composerHref(row.id), composer: null };
-	if (kind === 'music') {
-		return { name: null, composer: row.composer_id ? composerHref(row.composer_id) : null };
-	}
+	const composer = kind === 'music' && row.composer_id ? composerHref(row.composer_id) : null;
 	const param = kindSpec(kind)?.param;
-	if (!param) return { name: null, composer: null };
+	if (!param) return { name: null, composer };
 	const name = historyHref({
 		period: ALL,
 		start: '',
@@ -91,7 +90,7 @@ export function rowLinks(kind, row) {
 		requested: '',
 		target: { param, id: String(row.id) }
 	});
-	return { name, composer: null };
+	return { name, composer };
 }
 
 // 묶음의 머리: 가장 많이 튼 표기와 '표기 N개 · 선곡 M회'.

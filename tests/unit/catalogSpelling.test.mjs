@@ -55,7 +55,8 @@ test('rows link by id: composers to their page, others to their plays of all tim
 	for (const [kind, param] of [
 		['player', 'player_id'],
 		['conductor', 'conductor_id'],
-		['orchestra', 'orchestra_id']
+		['orchestra', 'orchestra_id'],
+		['music', 'music_id']
 	]) {
 		const links = rowLinks(kind, { id: 12, name: '같은 이름', count: 3 });
 		assert.equal(links.composer, null);
@@ -68,11 +69,12 @@ test('rows link by id: composers to their page, others to their plays of all tim
 	}
 });
 
-test('a work links its composer, not itself', () => {
+test('a work links its plays and its composer', () => {
 	const work = { id: 4, name: '교향곡 Op. 67', count: 2, composer_id: 9, composer_name: '가' };
-	assert.deepEqual(rowLinks('music', work), { name: null, composer: '/stat/composer/9' });
+	const plays = '/stat/history?period=all&music_id=4';
+	assert.deepEqual(rowLinks('music', work), { name: plays, composer: '/stat/composer/9' });
 	assert.deepEqual(rowLinks('music', { ...work, composer_id: null }), {
-		name: null,
+		name: plays,
 		composer: null
 	});
 	assert.deepEqual(rowLinks('unknown', work), { name: null, composer: null });

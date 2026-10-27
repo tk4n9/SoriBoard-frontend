@@ -34,7 +34,7 @@
 	let userId = initial.userId;
 	let includeMentees = initial.includeMentees;
 	let requested = initial.requested; // '' | 'true' | 'false'
-	let target = initial.target; // 작곡가·연주자·지휘자·오케스트라 하나(id), 없으면 null
+	let target = initial.target; // 작곡가·연주자·지휘자·오케스트라·곡 하나(id), 없으면 null
 	let targetLabel = target && targetText(target, null); // 이름을 찾으면 바꾼다
 	let searchInput;
 	const current = currentSemesterRange();

@@ -145,6 +145,14 @@ test('an id filter from the drill-down is read, written and sent to plays/', () 
 	assert.deepEqual(read('player_id=12').target, { param: 'player_id', id: '12' });
 	assert.deepEqual(read('conductor_id=3').target, { param: 'conductor_id', id: '3' });
 	assert.deepEqual(read('orchestra_id=5').target, { param: 'orchestra_id', id: '5' });
+	// 곡 하나(표기 정리의 곡 행에서).
+	const work = { param: 'music_id', id: '20' };
+	assert.deepEqual(read('music_id=20').target, work);
+	assert.equal(
+		historyHref({ ...DEFAULT, period: 'all', target: work }),
+		'/stat/history?period=all&music_id=20'
+	);
+	assert.deepEqual(params({ period: 'all', target: work }), { music_id: '20', limit: '50' });
 	// 통계 패널의 링크 그대로: 기간, 지기, id 필터(limit 은 없다).
 	const linked = {
 		...DEFAULT,
@@ -168,29 +176,36 @@ test('an id filter from the drill-down is read, written and sent to plays/', () 
 });
 
 test('invalid or unknown id filters are ignored, and only one is kept', () => {
-	for (const search of ['composer_id=0', 'player_id=x', 'orchestra_id=-1', 'music_id=3'])
+	for (const search of [
+		'composer_id=0',
+		'player_id=x',
+		'orchestra_id=-1',
+		'music_id=0',
+		'time_id=3'
+	])
 		assert.equal(read(search).target, null, search);
 	assert.deepEqual(read('orchestra_id=5&composer_id=4').target, {
 		param: 'composer_id',
 		id: '4'
 	});
 	assert.deepEqual(read('composer_id=abc&player_id=7').target, { param: 'player_id', id: '7' });
-	assert.equal(
-		historyHref({ ...DEFAULT, target: { param: 'music_id', id: '3' } }),
-		'/stat/history'
-	);
+	assert.deepEqual(read('music_id=3&conductor_id=8').target, { param: 'conductor_id', id: '8' });
+	assert.equal(historyHref({ ...DEFAULT, target: { param: 'time_id', id: '3' } }), '/stat/history');
 	assert.equal(historyHref({ ...DEFAULT, target: null }), '/stat/history');
 });
 
 test('the target name is looked up by id in its own ranking', () => {
 	assert.equal(targetLookup(null), null);
-	assert.equal(targetLookup({ param: 'music_id', id: '1' }), null);
+	assert.equal(targetLookup({ param: 'time_id', id: '1' }), null);
 	const lookup = targetLookup({ param: 'player_id', id: '12' });
 	assert.equal(lookup.endpoint, 'soloists');
 	assert.equal(lookup.params.toString(), 'player_id=12&limit=100');
 	assert.equal(targetLookup({ param: 'composer_id', id: '4' }).endpoint, 'composers');
 	assert.equal(targetLookup({ param: 'conductor_id', id: '4' }).endpoint, 'conductors');
 	assert.equal(targetLookup({ param: 'orchestra_id', id: '4' }).endpoint, 'orchestras');
+	const workLookup = targetLookup({ param: 'music_id', id: '20' });
+	assert.equal(workLookup.endpoint, 'works');
+	assert.equal(workLookup.params.toString(), 'music_id=20&limit=100');
 
 	const target = { param: 'player_id', id: '12' };
 	// 같은 이름의 다른 사람이 앞에 있어도 id 로 찾는다.
@@ -206,6 +221,10 @@ test('the target name is looked up by id in its own ranking', () => {
 	assert.equal(targetName(null, target), null);
 	assert.equal(targetText(target, '가상 첼리스트 (첼로)'), '연주자: 가상 첼리스트 (첼로)');
 	assert.equal(targetText({ param: 'composer_id', id: '4' }, null), '작곡가 #4');
+	const work = { param: 'music_id', id: '20' };
+	const works = { items: [{ id: 20, name: '가상 작곡가 - 가상 서곡 Op. 12', count: 5 }] };
+	assert.equal(targetText(work, targetName(works, work)), '곡: 가상 작곡가 - 가상 서곡 Op. 12');
+	assert.equal(targetText(work, null), '곡 #20');
 });
 
 test('a next page that repeats rows (new plays shifted it) adds each play once', () => {
