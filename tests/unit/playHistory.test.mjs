@@ -14,6 +14,7 @@ import {
 	targetLookup,
 	targetName,
 	targetText,
+	historyFileTags,
 	drillWorkTargets,
 	sessionText,
 	workText,
@@ -570,4 +571,50 @@ test('targetHistoryHref opens the plays of one 독주자 (or other id filter), i
 	assert.equal(targetHistoryHref('music_id', 20, '3'), workHistoryHref(20, '3'));
 	// 선곡 기록이 모르는 파라미터는 쓰지 않는다.
 	assert.equal(targetHistoryHref('user_id', 5, '2'), '/stat/history?semester_id=2');
+});
+
+test('historyFileTags names the id filters, 신청곡 and the search word', () => {
+	const filter = {
+		...DEFAULT,
+		q: '서곡',
+		requested: 'true',
+		targets: [
+			{ param: 'composer_id', id: '4' },
+			{ param: 'music_id', id: '20' }
+		]
+	};
+	const names = { composer_id: '가상 작곡가 D', music_id: '가상 작곡가 D - 가상 서곡 Op. 12' };
+	assert.deepEqual(historyFileTags(filter, names), [
+		'가상 작곡가 D',
+		'가상 작곡가 D - 가상 서곡 Op. 12',
+		'신청곡만',
+		'검색 서곡'
+	]);
+	assert.deepEqual(historyFileTags({ ...DEFAULT, requested: 'false' }), ['신청곡 제외', '']);
+});
+
+test('historyFileTags is empty without filters, so the file name stays as before', () => {
+	assert.deepEqual(historyFileTags(DEFAULT), ['', '']);
+	assert.deepEqual(historyFileTags({ ...DEFAULT, targets: undefined }, {}), ['', '']);
+});
+
+test('historyFileTags falls back to the id when a name was not found', () => {
+	const filter = { ...DEFAULT, targets: [{ param: 'player_id', id: '5' }] };
+	assert.deepEqual(historyFileTags(filter), ['연주자 #5', '', '']);
+	assert.deepEqual(historyFileTags(filter, { player_id: null }), ['연주자 #5', '', '']);
+	assert.deepEqual(historyFileTags(filter, { composer_id: '다른 사람' }), ['연주자 #5', '', '']);
+});
+
+test('historyFileTags clips long names and search words to 40 characters', () => {
+	const long = '가'.repeat(41);
+	const filter = { ...DEFAULT, q: long, targets: [{ param: 'music_id', id: '1' }] };
+	assert.deepEqual(historyFileTags(filter, { music_id: long }), [
+		`${'가'.repeat(40)}…`,
+		'',
+		`검색 ${'가'.repeat(40)}…`
+	]);
+	// 40자까지는 그대로, 서로게이트 쌍은 한 글자로 센다.
+	const emoji = '🎻'.repeat(40);
+	assert.deepEqual(historyFileTags({ ...DEFAULT, q: emoji }), ['', `검색 ${emoji}`]);
+	assert.deepEqual(historyFileTags({ ...DEFAULT, q: `${emoji}🎻` }), ['', `검색 ${emoji}…`]);
 });

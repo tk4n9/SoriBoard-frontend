@@ -210,6 +210,31 @@ export function targetText(target, name) {
 	return name ? `${noun}: ${name}` : `${noun} #${target.id}`;
 }
 
+// CSV 파일 이름에 넣을 기간·지기 밖의 조건: id 필터마다 그 이름(모르면 '작곡가 #12'), 신청곡,
+// 검색어('검색 베토벤'). 긴 이름과 검색어는 앞의 FILE_TEXT_LENGTH 자에 '…' 를 붙인다.
+const FILE_TEXT_LENGTH = 40;
+/** @type {Record<string, string>} */
+const REQUESTED_FILE_TEXT = { true: '신청곡만', false: '신청곡 제외' };
+/** @param {string} text */
+function clipFileText(text) {
+	const chars = Array.from(text);
+	return chars.length > FILE_TEXT_LENGTH ? `${chars.slice(0, FILE_TEXT_LENGTH).join('')}…` : text;
+}
+/**
+ * @param {HistoryFilter} filter
+ * @param {Record<string, string | null>} [names] 필터(param)마다 찾은 이름
+ * @returns {string[]}
+ */
+export function historyFileTags(filter, names = {}) {
+	return [
+		...(filter.targets ?? []).map((target) =>
+			clipFileText(names[target.param] || targetText(target, null))
+		),
+		REQUESTED_FILE_TEXT[filter.requested] ?? '',
+		filter.q ? `검색 ${clipFileText(filter.q)}` : ''
+	];
+}
+
 // 학기의 날짜 범위는 백엔드만 알고 plays/ 는 돌려주지 않으므로, 그 학기로 거른 stats/summary 의
 // filters 에서 읽는다. 그 요청의 쿼리. 학기가 아니면 null.
 /** @param {string} period */

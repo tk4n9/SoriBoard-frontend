@@ -22,6 +22,7 @@
 		targetLookup,
 		targetName,
 		targetText,
+		historyFileTags,
 		semesterRangeParams,
 		historyPeriod
 	} from '$lib/playHistory.js';
@@ -40,6 +41,8 @@
 	let targets = initial.targets; // 작곡가·연주자·지휘자·오케스트라·곡의 id 필터, 없으면 []
 	// 필터마다(param) 보일 문구. 이름을 찾으면 바꾼다.
 	let targetLabels = Object.fromEntries(targets.map((t) => [t.param, targetText(t, null)]));
+	/** @type {Record<string, string | null>} */
+	let targetNames = {}; // 필터마다 찾은 이름(CSV 파일 이름에 쓴다)
 	let searchInput;
 	const current = currentSemesterRange();
 
@@ -122,8 +125,10 @@
 			const res = await fetch(`/api/stats/${lookup.endpoint}?${lookup.params}`);
 			if (!res.ok) throw new Error(`${lookup.endpoint} ${res.status}`);
 			const name = targetName(await res.json(), wanted);
-			if (targets.includes(wanted))
+			if (targets.includes(wanted)) {
 				targetLabels = { ...targetLabels, [wanted.param]: targetText(wanted, name) };
+				targetNames = { ...targetNames, [wanted.param]: name };
+			}
 		} catch (e) {
 			console.error('선곡 기록 대상 이름 로딩 실패', e);
 		}
@@ -180,12 +185,13 @@
 
 	async function exportCsv() {
 		const wanted = filter();
-		// 파일 이름에 누른 때의 기간과 지기를 넣는다(statFileName.js).
+		// 파일 이름에 누른 때의 기간·지기와 그 밖의 조건(id 필터, 신청곡, 검색어)을 넣는다(statFileName.js).
 		const filename = downloadName(
 			[
 				'선곡기록',
 				periodText,
 				memberFileText({ userId, name: userName, includeMentees }),
+				historyFileTags(wanted, targetNames),
 				todayStamp()
 			],
 			'csv'
