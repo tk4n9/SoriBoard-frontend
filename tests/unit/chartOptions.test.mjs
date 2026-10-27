@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { timelineOption, diversityLineOption } from '../../src/lib/chartOptions.js';
+import { timelineOption, diversityLineOption, eraPieOption } from '../../src/lib/chartOptions.js';
 
 const labels = ['2025-1학기', '2025-2학기', '2026-1학기', '2026-2학기'];
 const series = [
@@ -30,4 +30,23 @@ test('without a subtitle the diversity legend stays right under the title', () =
 	const option = diversityLineOption(labels, series, '월별 다양성 추이', '');
 	assert.equal(option.legend.top, 34);
 	assert.equal(option.grid.top, 72);
+});
+
+test('pie slice labels fit between the subtitle and the legend of a 340px card', () => {
+	const option = eraPieOption(
+		{ labels: ['바로크', '고전', '낭만'], values: [3, 1, 6] },
+		'시대별 분포',
+		'전체 · 총 10곡'
+	);
+	const [series] = option.series;
+	const pct = (s) => Number.parseFloat(s) / 100;
+	// 카드 캔버스 340px: 부제는 ~60px 에서 끝나고 범례는 ~320px 에서 시작한다.
+	// 맨 위·맨 아래 조각의 이름표는 인출선(ECharts 기본 15px) 끝에 두 줄(~26px)로 놓인다.
+	const height = 340;
+	const outer = (pct(series.radius[1]) * height) / 2;
+	const cy = pct(series.center[1]) * height;
+	const reach = outer + 15 + 13;
+	assert.ok(cy - reach >= 60, `labels reach up to ${cy - reach}px`);
+	assert.ok(cy + reach <= 320, `labels reach down to ${cy + reach}px`);
+	assert.equal(option.legend.bottom, 0);
 });

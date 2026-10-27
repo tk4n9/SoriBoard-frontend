@@ -247,8 +247,10 @@ export function eraPieOption({ labels, values }, title, subtitle) {
 		series: [
 			{
 				type: 'pie',
-				radius: ['42%', '68%'],
-				center: ['50%', '54%'],
+				// 340px 카드에서 부제(~60px)와 범례(~320px) 사이에 조각 이름표(인출선 15px + 두 줄
+				// 글자)까지 들어가는 크기. 68% 일 때 아래쪽 조각의 이름표가 범례에 겹쳤다.
+				radius: ['36%', '58%'],
+				center: ['50%', '56%'],
 				avoidLabelOverlap: true,
 				itemStyle: { borderColor: OUTLINE, borderWidth: 1 },
 				emphasis: NO_EMPHASIS,
