@@ -36,8 +36,9 @@
 	let userId = initial.userId;
 	let includeMentees = initial.includeMentees;
 	let requested = initial.requested; // '' | 'true' | 'false'
-	let target = initial.target; // 작곡가·연주자·지휘자·오케스트라·곡 하나(id), 없으면 null
-	let targetLabel = target && targetText(target, null); // 이름을 찾으면 바꾼다
+	let targets = initial.targets; // 작곡가·연주자·지휘자·오케스트라·곡의 id 필터, 없으면 []
+	// 필터마다(param) 보일 문구. 이름을 찾으면 바꾼다.
+	let targetLabels = Object.fromEntries(targets.map((t) => [t.param, targetText(t, null)]));
 	let searchInput;
 	const current = currentSemesterRange();
 
@@ -49,7 +50,7 @@
 		userId,
 		includeMentees,
 		requested,
-		target
+		targets
 	});
 
 	/** @type {import('$lib/playHistory.js').Play[]} */
@@ -95,15 +96,16 @@
 	}
 
 	// id 필터의 이름은 URL에 없으므로 그 대상의 순위에서 id 로 찾는다(실패하면 '작곡가 #id').
-	async function loadTargetName() {
-		const wanted = target;
+	/** @param {import('$lib/playHistory.js').HistoryTarget} wanted */
+	async function loadTargetName(wanted) {
 		const lookup = targetLookup(wanted);
-		if (!wanted || !lookup) return;
+		if (!lookup) return;
 		try {
 			const res = await fetch(`/api/stats/${lookup.endpoint}?${lookup.params}`);
 			if (!res.ok) throw new Error(`${lookup.endpoint} ${res.status}`);
 			const name = targetName(await res.json(), wanted);
-			if (target === wanted) targetLabel = targetText(wanted, name);
+			if (targets.includes(wanted))
+				targetLabels = { ...targetLabels, [wanted.param]: targetText(wanted, name) };
 		} catch (e) {
 			console.error('선곡 기록 대상 이름 로딩 실패', e);
 		}
@@ -128,7 +130,7 @@
 
 	onMount(() => {
 		load();
-		loadTargetName();
+		targets.forEach(loadTargetName);
 		loadSemesterRange();
 	});
 
@@ -187,8 +189,9 @@
 	}
 
 	// 해제하면 단추가 사라지므로 포커스를 검색란으로 옮긴다.
-	async function clearTarget() {
-		target = null;
+	/** @param {import('$lib/playHistory.js').HistoryTarget} target */
+	async function clearTarget(target) {
+		targets = targets.filter((t) => t !== target);
 		apply();
 		await tick();
 		searchInput.focus();
@@ -237,14 +240,18 @@
 			<button type="submit">검색</button>
 		</form>
 		<div class="filters">
-			{#if target}
+			{#each targets as target (target.param)}
 				<span class="target">
-					{targetLabel}
-					<button class="tool-btn" on:click={clearTarget} aria-label={`${targetLabel} 필터 해제`}>
+					{targetLabels[target.param]}
+					<button
+						class="tool-btn"
+						on:click={() => clearTarget(target)}
+						aria-label={`${targetLabels[target.param]} 필터 해제`}
+					>
 						해제
 					</button>
 				</span>
-			{/if}
+			{/each}
 			<PeriodSelect
 				bind:period
 				bind:start={customStart}

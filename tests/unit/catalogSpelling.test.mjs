@@ -64,7 +64,7 @@ test('rows link by id: composers to their page, others to their plays of all tim
 		assert.equal(url.pathname, '/stat/history');
 		const filter = readHistoryQuery(url.searchParams);
 		assert.equal(filter.period, 'all');
-		assert.deepEqual(filter.target, { param, id: '12' });
+		assert.deepEqual(filter.targets, [{ param, id: '12' }]);
 		assert.equal(url.searchParams.has('q'), false, 'never by name');
 	}
 });

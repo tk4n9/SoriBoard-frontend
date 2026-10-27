@@ -88,7 +88,7 @@ export function rowLinks(kind, row) {
 		userId: null,
 		includeMentees: false,
 		requested: '',
-		target: { param, id: String(row.id) }
+		targets: [{ param, id: String(row.id) }]
 	});
 	return { name, composer };
 }

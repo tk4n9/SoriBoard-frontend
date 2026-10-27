@@ -27,7 +27,7 @@ export function composerHistoryHref(id) {
 		userId: null,
 		includeMentees: false,
 		requested: '',
-		target: { param: 'composer_id', id: String(id) }
+		targets: [{ param: 'composer_id', id: String(id) }]
 	});
 }
 

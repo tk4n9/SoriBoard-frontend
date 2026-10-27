@@ -13,6 +13,7 @@ import {
 	targetLookup,
 	targetName,
 	targetText,
+	drillWorkTargets,
 	sessionText,
 	workText,
 	workParts,
@@ -33,7 +34,7 @@ const DEFAULT = {
 	userId: null,
 	includeMentees: false,
 	requested: '',
-	target: null
+	targets: []
 };
 const CURRENT_RANGE = { start: '2026-09-01', end: '2026-10-27' };
 const params = (filter, offset) =>
@@ -144,41 +145,44 @@ test('plays/ gets the search, the 지기 and 신청곡, and the offset after the
 
 test('an id filter from the drill-down is read, written and sent to plays/', () => {
 	const composer = { param: 'composer_id', id: '4' };
-	assert.deepEqual(read('composer_id=4').target, composer);
-	assert.deepEqual(read('player_id=12').target, { param: 'player_id', id: '12' });
-	assert.deepEqual(read('conductor_id=3').target, { param: 'conductor_id', id: '3' });
-	assert.deepEqual(read('orchestra_id=5').target, { param: 'orchestra_id', id: '5' });
+	assert.deepEqual(read('composer_id=4').targets, [composer]);
+	assert.deepEqual(read('player_id=12').targets, [{ param: 'player_id', id: '12' }]);
+	assert.deepEqual(read('conductor_id=3').targets, [{ param: 'conductor_id', id: '3' }]);
+	assert.deepEqual(read('orchestra_id=5').targets, [{ param: 'orchestra_id', id: '5' }]);
 	// 곡 하나(표기 정리의 곡 행에서).
 	const work = { param: 'music_id', id: '20' };
-	assert.deepEqual(read('music_id=20').target, work);
+	assert.deepEqual(read('music_id=20').targets, [work]);
 	assert.equal(
-		historyHref({ ...DEFAULT, period: 'all', target: work }),
+		historyHref({ ...DEFAULT, period: 'all', targets: [work] }),
 		'/stat/history?period=all&music_id=20'
 	);
-	assert.deepEqual(params({ period: 'all', target: work }), { music_id: '20', limit: '50' });
+	assert.deepEqual(params({ period: 'all', targets: [work] }), { music_id: '20', limit: '50' });
 	// 통계 패널의 링크 그대로: 기간, 지기, id 필터(limit 은 없다).
 	const linked = {
 		...DEFAULT,
 		period: '3',
 		userId: '2',
 		includeMentees: true,
-		target: { param: 'conductor_id', id: '9' }
+		targets: [{ param: 'conductor_id', id: '9' }]
 	};
 	const href = historyHref(linked);
 	assert.equal(href, '/stat/history?semester_id=3&user_id=2&include_mentees=true&conductor_id=9');
 	assert.deepEqual(read(new URL(href, 'http://x').search), linked);
-	assert.deepEqual(params({ period: 'all', target: composer }), { composer_id: '4', limit: '50' });
-	assert.deepEqual(params({ period: 'all', q: 'x', target: composer }, 50), {
+	assert.deepEqual(params({ period: 'all', targets: [composer] }), {
+		composer_id: '4',
+		limit: '50'
+	});
+	assert.deepEqual(params({ period: 'all', q: 'x', targets: [composer] }, 50), {
 		q: 'x',
 		composer_id: '4',
 		limit: '50',
 		offset: '50'
 	});
 	// 통계로 돌아가는 링크에는 남기지 않는다.
-	assert.equal(statHref({ ...DEFAULT, target: composer }), '/stat');
+	assert.equal(statHref({ ...DEFAULT, targets: [composer] }), '/stat');
 });
 
-test('invalid or unknown id filters are ignored, and only one is kept', () => {
+test('invalid or unknown id filters are ignored', () => {
 	for (const search of [
 		'composer_id=0',
 		'player_id=x',
@@ -186,15 +190,66 @@ test('invalid or unknown id filters are ignored, and only one is kept', () => {
 		'music_id=0',
 		'time_id=3'
 	])
-		assert.equal(read(search).target, null, search);
-	assert.deepEqual(read('orchestra_id=5&composer_id=4').target, {
-		param: 'composer_id',
-		id: '4'
+		assert.deepEqual(read(search).targets, [], search);
+	assert.deepEqual(read('composer_id=abc&player_id=7').targets, [{ param: 'player_id', id: '7' }]);
+	assert.equal(
+		historyHref({ ...DEFAULT, targets: [{ param: 'time_id', id: '3' }] }),
+		'/stat/history'
+	);
+	assert.equal(historyHref({ ...DEFAULT, targets: [] }), '/stat/history');
+	assert.equal(historyHref({ ...DEFAULT, targets: undefined }), '/stat/history');
+});
+
+test('several id filters are all kept, in a fixed order, and all sent to plays/', () => {
+	const player = { param: 'player_id', id: '12' };
+	const work = { param: 'music_id', id: '20' };
+	// plays/ 는 id 필터를 모두 맞는 선곡으로 거른다(AND).
+	assert.deepEqual(read('music_id=20&player_id=12').targets, [player, work]);
+	assert.deepEqual(read('orchestra_id=5&composer_id=4').targets, [
+		{ param: 'composer_id', id: '4' },
+		{ param: 'orchestra_id', id: '5' }
+	]);
+	assert.deepEqual(read('music_id=3&conductor_id=x').targets, [{ param: 'music_id', id: '3' }]);
+	const filter = { ...DEFAULT, period: 'all', targets: [player, work] };
+	const href = historyHref(filter);
+	assert.equal(href, '/stat/history?period=all&player_id=12&music_id=20');
+	assert.deepEqual(read(new URL(href, 'http://x').search), filter);
+	assert.deepEqual(params({ period: 'all', targets: [player, work] }), {
+		player_id: '12',
+		music_id: '20',
+		limit: '50'
 	});
-	assert.deepEqual(read('composer_id=abc&player_id=7').target, { param: 'player_id', id: '7' });
-	assert.deepEqual(read('music_id=3&conductor_id=8').target, { param: 'conductor_id', id: '8' });
-	assert.equal(historyHref({ ...DEFAULT, target: { param: 'time_id', id: '3' } }), '/stat/history');
-	assert.equal(historyHref({ ...DEFAULT, target: null }), '/stat/history');
+	// 알 수 없는 것은 빼고 나머지만 쓴다.
+	assert.equal(
+		historyHref({ ...DEFAULT, targets: [{ param: 'time_id', id: '3' }, work] }),
+		'/stat/history?music_id=20'
+	);
+});
+
+test('a work in the drill-down panel opens its plays with the panel target, or alone for a 작곡가', () => {
+	assert.deepEqual(drillWorkTargets({ param: 'player_id', id: 12 }, 20), [
+		{ param: 'player_id', id: '12' },
+		{ param: 'music_id', id: '20' }
+	]);
+	assert.deepEqual(drillWorkTargets({ param: 'conductor_id', id: 9 }, '7'), [
+		{ param: 'conductor_id', id: '9' },
+		{ param: 'music_id', id: '7' }
+	]);
+	assert.deepEqual(drillWorkTargets({ param: 'orchestra_id', id: 5 }, 7)[0], {
+		param: 'orchestra_id',
+		id: '5'
+	});
+	// 곡의 작곡가는 하나뿐이다.
+	assert.deepEqual(drillWorkTargets({ param: 'composer_id', id: 4 }, 20), [
+		{ param: 'music_id', id: '20' }
+	]);
+	const href = historyHref({
+		...DEFAULT,
+		period: '3',
+		userId: '2',
+		targets: drillWorkTargets({ param: 'player_id', id: 12 }, 20)
+	});
+	assert.equal(href, '/stat/history?semester_id=3&user_id=2&player_id=12&music_id=20');
 });
 
 test('the target name is looked up by id in its own ranking', () => {
@@ -484,11 +539,11 @@ test('workHistoryHref opens the plays of one work, all time or in one 학기', (
 	assert.deepEqual(read(workHistoryHref(20, '3').split('?')[1]), {
 		...DEFAULT,
 		period: '3',
-		target: { param: 'music_id', id: '20' }
+		targets: [{ param: 'music_id', id: '20' }]
 	});
 	assert.deepEqual(read(workHistoryHref(20).split('?')[1]), {
 		...DEFAULT,
 		period: 'all',
-		target: { param: 'music_id', id: '20' }
+		targets: [{ param: 'music_id', id: '20' }]
 	});
 });

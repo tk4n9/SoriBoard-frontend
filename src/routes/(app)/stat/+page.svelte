@@ -30,7 +30,7 @@
 		periodRangeText,
 		currentSemesterRange
 	} from '$lib/statPeriod.js';
-	import { historyHref } from '$lib/playHistory.js';
+	import { historyHref, drillWorkTargets } from '$lib/playHistory.js';
 	import { composerHref } from '$lib/composerStats.js';
 	import { reportHref } from '$lib/semesterReport.js';
 
@@ -327,7 +327,12 @@
 	// drill-down 패널의 'N곡 모두 보기': stats/works 에 보낸 것과 같은 기간·지기·id 필터.
 	$: drillHistoryLink =
 		drill &&
-		historyHref({ ...historyFilter, target: { param: drill.param, id: String(drill.id) } });
+		historyHref({ ...historyFilter, targets: [{ param: drill.param, id: String(drill.id) }] });
+	// 패널의 곡 하나: 같은 기간·지기에서 그 대상이 그 곡을 튼 선곡.
+	$: drillWorkLink = (item) =>
+		drill && item.id != null
+			? historyHref({ ...historyFilter, targets: drillWorkTargets(drill, item.id) })
+			: null;
 </script>
 
 <svelte:head>
@@ -502,6 +507,7 @@
 					error={drillError}
 					{scopeLabel}
 					historyLink={drillHistoryLink}
+					workLink={drillWorkLink}
 					composerLink={drill.card === 'composers' ? composerHref(drill.id) : ''}
 					on:close={closeDrill}
 				/>

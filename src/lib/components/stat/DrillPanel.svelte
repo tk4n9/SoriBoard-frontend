@@ -14,6 +14,9 @@
 	export let scopeLabel = '';
 	export let historyLink = ''; // 같은 기간·범위·대상의 선곡 기록
 	export let composerLink = ''; // 작곡가면 그 작곡가 페이지
+	// 주면 곡 이름이 그 곡의 선곡 기록으로 가는 링크가 된다(stats/works 의 항목 → 주소 또는 null).
+	/** @type {((item: { id: number | null }) => string | null) | null} */
+	export let workLink = null;
 
 	const dispatch = createEventDispatcher();
 	let panel;
@@ -37,6 +40,7 @@
 			{ labels: items.map((item) => workLabel(item, target)), values: items.map((i) => i.count) },
 			'곡'
 		);
+	$: links = workLink ? items.map(workLink) : [];
 </script>
 
 <!-- 포커스가 패널 안에 있으면 Escape 도 닫기와 같다. -->
@@ -66,7 +70,7 @@
 		</button>
 	</div>
 	{#if !loading && !error && table}
-		<DataTable {table} {title} {subtitle} />
+		<DataTable {table} {title} {subtitle} {links} />
 	{:else}
 		<div class="panel-title">{title}</div>
 		<div class="panel-subtitle">{subtitle}</div>

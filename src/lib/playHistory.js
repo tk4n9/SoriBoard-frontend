@@ -1,8 +1,8 @@
 // 선곡 기록(/stat/history): 필터와 URL 쿼리스트링, plays/ 요청 파라미터, 표의 문구 사이의 변환.
 // 기간은 통계 페이지와 같은 키(statPeriod.js)를 쓰므로, 통계의 링크가 그대로 같은 기간을 연다.
 // 그 밖에 q(검색어), user_id·include_mentees(지기, 없으면 전체), requested(true = 신청곡만,
-// false = 신청곡 제외), 그리고 id 필터 하나(통계 drill-down 의 composer_id, player_id,
-// conductor_id, orchestra_id 또는 곡 하나의 music_id)를 둔다. 기본값은 URL에 남기지 않고, 형식이 틀린 값은 기본값으로 읽는다.
+// false = 신청곡 제외), 그리고 id 필터(통계 drill-down 의 composer_id, player_id, conductor_id,
+// orchestra_id 와 곡 하나의 music_id, 함께 주면 모두 맞는 선곡)를 둔다. 기본값은 URL에 남기지 않고, 형식이 틀린 값은 기본값으로 읽는다.
 import {
 	CURRENT,
 	ALL,
@@ -25,7 +25,7 @@ const LOOKUP_LIMIT = 100;
 /** @typedef {{ param: string, id: string }} HistoryTarget */
 /**
  * @typedef {{ period: string, start: string, end: string, q: string, userId: string | null,
- *   includeMentees: boolean, requested: '' | 'true' | 'false', target?: HistoryTarget | null }} HistoryFilter
+ *   includeMentees: boolean, requested: '' | 'true' | 'false', targets?: HistoryTarget[] }} HistoryFilter
  */
 
 /** @param {string | null} raw */
@@ -40,25 +40,24 @@ const TARGETS = { ...DRILL_CARDS, works: { param: 'music_id', noun: '곡' } };
 const targetCard = (target) =>
 	target ? Object.entries(TARGETS).find(([, spec]) => spec.param === target.param) : undefined;
 
-// URL의 id 필터. 여럿이면 TARGETS 순서로 처음 맞는 하나만 쓴다.
+// URL의 id 필터들, TARGETS 순서로. 형식이 틀린 값은 건너뛴다.
 /**
  * @param {URLSearchParams} params
- * @returns {HistoryTarget | null}
+ * @returns {HistoryTarget[]}
  */
-function readTarget(params) {
-	for (const { param } of Object.values(TARGETS)) {
+function readTargets(params) {
+	return Object.values(TARGETS).flatMap(({ param }) => {
 		const id = readId(params.get(param));
-		if (id) return { param, id };
-	}
-	return null;
+		return id ? [{ param, id }] : [];
+	});
 }
 
 /**
  * @param {URLSearchParams} params
- * @param {HistoryTarget | null | undefined} target
+ * @param {HistoryTarget[] | undefined} targets
  */
-function writeTarget(params, target) {
-	if (targetCard(target)) params.set(target.param, target.id);
+function writeTargets(params, targets = []) {
+	for (const target of targets) if (targetCard(target)) params.set(target.param, target.id);
 }
 
 /**
@@ -79,7 +78,7 @@ export function readHistoryQuery(params) {
 		// 견습 포함은 지기를 고른 때만 뜻이 있다.
 		includeMentees: userId !== null && params.get('include_mentees') === 'true',
 		requested: requested === 'true' || requested === 'false' ? requested : '',
-		target: readTarget(params)
+		targets: readTargets(params)
 	};
 }
 
@@ -94,7 +93,7 @@ export function historyHref(filter, pathname = '/stat/history') {
 		if (filter.includeMentees) params.set('include_mentees', 'true');
 	}
 	if (filter.requested) params.set('requested', filter.requested);
-	writeTarget(params, filter.target);
+	writeTargets(params, filter.targets);
 	const search = params.toString();
 	return `${pathname}${search ? `?${search}` : ''}`;
 }
@@ -113,8 +112,22 @@ export function workHistoryHref(musicId, period = ALL) {
 		userId: null,
 		includeMentees: false,
 		requested: '',
-		target: { param: 'music_id', id: String(musicId) }
+		targets: [{ param: 'music_id', id: String(musicId) }]
 	});
+}
+
+// drill-down 패널의 곡 하나 → 선곡 기록의 id 필터: 그 패널의 대상과 그 곡. 곡의 작곡가는
+// 하나뿐이므로 작곡가 패널에서는 곡만 둔다(작곡가 페이지의 곡 링크와 같다).
+/**
+ * @param {{ param: string, id: number | string }} drill
+ * @param {number | string} musicId
+ * @returns {HistoryTarget[]}
+ */
+export function drillWorkTargets(drill, musicId) {
+	const work = { param: 'music_id', id: String(musicId) };
+	return drill.param === 'composer_id'
+		? [work]
+		: [{ param: drill.param, id: String(drill.id) }, work];
 }
 
 // 필터 → 같은 기간·지기의 통계 보기 경로(검색어, 신청곡과 id 필터는 통계에 없다).
@@ -151,7 +164,7 @@ export function playsParams(filter, current, offset = 0, limit = PAGE_SIZE) {
 		if (filter.includeMentees) params.set('include_mentees', 'true');
 	}
 	if (filter.requested) params.set('requested', filter.requested);
-	writeTarget(params, filter.target);
+	writeTargets(params, filter.targets);
 	params.set('limit', String(limit));
 	if (offset > 0) params.set('offset', String(offset));
 	return params;

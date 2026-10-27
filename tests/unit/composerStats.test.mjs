@@ -24,7 +24,7 @@ test('links: the composer page and its plays over all time', () => {
 	assert.equal(href, '/stat/history?period=all&composer_id=7');
 	const query = readHistoryQuery(new URL(href, 'http://x').searchParams);
 	assert.equal(query.period, 'all');
-	assert.deepEqual(query.target, { param: 'composer_id', id: '7' });
+	assert.deepEqual(query.targets, [{ param: 'composer_id', id: '7' }]);
 });
 
 test('facts name the era and the birth year, or say they are unknown', () => {
