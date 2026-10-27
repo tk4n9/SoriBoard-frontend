@@ -84,6 +84,8 @@
 	const editButtons = {};
 	/** @type {HTMLInputElement} */
 	let yearInput;
+	/** @type {HTMLButtonElement} */
+	let saveButton;
 
 	async function startEdit(composer) {
 		editingId = composer.id;
@@ -105,31 +107,43 @@
 
 	$: yearError = editingId === null ? '' : birthYearError(draft.birthYear, thisYear);
 
+	// 저장하는 동안에는 다른 줄을 열 수 없고(수정 단추가 꺼진다) Escape 도 듣지 않는다.
+	// 그래서 답은 늘 저장한 그 줄에 닿는다. 검색으로 그 줄이 닫혔다면 결과를 상태 줄에 알린다.
 	async function save(composer) {
 		if (yearError || saving) return;
 		const body = composerPatch(composer, draft);
 		if (!body) return stopEdit();
 		saving = true;
 		saveError = '';
+		let result = null;
+		let failure = '';
 		try {
 			const res = await fetch(`/api/composers/${composer.id}`, {
 				method: 'PATCH',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify(body)
 			});
-			const result = await res.json().catch(() => null);
-			if (!res.ok) {
-				saveError = res.status === 400 ? patchErrorText(result) : '저장하지 못했습니다.';
-				return;
-			}
-			composers = replaceComposer(composers, result);
-			status = `‘${result.name}’ 저장됨 · 시대 ${result.era}`;
-			await stopEdit();
+			result = await res.json().catch(() => null);
+			if (!res.ok) failure = res.status === 400 ? patchErrorText(result) : '저장하지 못했습니다.';
+			else if (!result) failure = '저장하지 못했습니다.';
 		} catch (e) {
 			console.error('작곡가 저장 실패', e);
-			saveError = '저장하지 못했습니다.';
+			failure = '저장하지 못했습니다.';
 		} finally {
 			saving = false;
+		}
+		const open = editingId === composer.id;
+		if (!failure) {
+			composers = replaceComposer(composers, result);
+			status = `‘${result.name}’ 저장됨 · 시대 ${result.era}`;
+			if (open) await stopEdit();
+		} else if (!open) {
+			status = `‘${composer.name}’ 저장하지 못했습니다.`;
+		} else {
+			saveError = failure;
+			// 누른 저장 단추가 잠시 꺼지며 포커스를 잃었다면 그 단추로 되돌린다.
+			await tick();
+			if (!document.activeElement || document.activeElement === document.body) saveButton?.focus();
 		}
 	}
 
@@ -139,7 +153,7 @@
 			save(composer);
 		} else if (e.key === 'Escape') {
 			e.preventDefault();
-			stopEdit();
+			if (!saving) stopEdit();
 		}
 	}
 
@@ -260,6 +274,7 @@
 										<div class="buttons">
 											<button
 												class="tool-btn"
+												bind:this={saveButton}
 												on:click={() => save(composer)}
 												disabled={saving || Boolean(yearError)}
 											>
@@ -283,6 +298,7 @@
 											class="tool-btn"
 											bind:this={editButtons[composer.id]}
 											on:click={() => startEdit(composer)}
+											disabled={saving}
 											aria-label={`${composer.name} 수정`}
 										>
 											수정
