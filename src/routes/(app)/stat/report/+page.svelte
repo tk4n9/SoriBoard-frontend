@@ -8,7 +8,8 @@
 	import { rankTable, formatCount } from '$lib/statTable.js';
 	import { sortSemesters, semesterLabel, periodRangeText } from '$lib/statPeriod.js';
 	import { composerHref } from '$lib/composerStats.js';
-	import { workHistoryHref } from '$lib/playHistory.js';
+	import { workHistoryHref, targetHistoryHref } from '$lib/playHistory.js';
+	import { DRILL_CARDS } from '$lib/statDrill.js';
 	import { pageTitle } from '$lib/statTitle.js';
 	import {
 		reportHref,
@@ -128,12 +129,19 @@
 	const count = (v) => (v == null ? '—' : formatCount(v));
 	$: empty = summary && summary.total_plays === 0;
 
-	// 순위 표(상위 10). 작곡가 이름은 작곡가 페이지로, 곡 이름은 이 학기의 그 곡 선곡 기록으로 간다.
+	// 순위 표(상위 10). 작곡가 이름은 작곡가 페이지로, 독주자·곡 이름은 이 학기에 그 독주자·곡을 튼
+	// 선곡 기록으로 간다.
 	const linksOf = (envelope) =>
 		envelope ? envelope.items.map((item) => composerHref(item.id)) : [];
 	const workLinksOf = (envelope, semesterId) =>
 		envelope && semesterId
 			? envelope.items.map((item) => workHistoryHref(item.id, semesterId))
+			: [];
+	const soloistLinksOf = (envelope, semesterId) =>
+		envelope && semesterId
+			? envelope.items.map((item) =>
+					targetHistoryHref(DRILL_CARDS.soloists.param, item.id, semesterId)
+				)
 			: [];
 	$: semesterId = semester ? String(semester.id) : '';
 	$: topCards = [
@@ -147,7 +155,7 @@
 			key: 'soloists',
 			title: '많이 튼 독주자',
 			table: soloists?.labels.length ? rankTable(soloists, '연주자') : null,
-			links: []
+			links: soloistLinksOf(soloists, semesterId)
 		},
 		{
 			key: 'works',

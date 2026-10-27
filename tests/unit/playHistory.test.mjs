@@ -7,6 +7,7 @@ import {
 	readHistoryQuery,
 	historyHref,
 	workHistoryHref,
+	targetHistoryHref,
 	statHref,
 	playsParams,
 	appendPage,
@@ -546,4 +547,18 @@ test('workHistoryHref opens the plays of one work, all time or in one 학기', (
 		period: 'all',
 		targets: [{ param: 'music_id', id: '20' }]
 	});
+});
+
+test('targetHistoryHref opens the plays of one 독주자 (or other id filter), in one 학기 or all time', () => {
+	assert.equal(targetHistoryHref('player_id', 5, '2'), '/stat/history?semester_id=2&player_id=5');
+	assert.equal(targetHistoryHref('player_id', '5'), '/stat/history?period=all&player_id=5');
+	assert.deepEqual(read(targetHistoryHref('player_id', 5, '2').split('?')[1]), {
+		...DEFAULT,
+		period: '2',
+		targets: [{ param: 'player_id', id: '5' }]
+	});
+	// 곡 하나는 workHistoryHref 와 같다.
+	assert.equal(targetHistoryHref('music_id', 20, '3'), workHistoryHref(20, '3'));
+	// 선곡 기록이 모르는 파라미터는 쓰지 않는다.
+	assert.equal(targetHistoryHref('user_id', 5, '2'), '/stat/history?semester_id=2');
 });

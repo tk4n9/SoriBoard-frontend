@@ -98,12 +98,13 @@ export function historyHref(filter, pathname = '/stat/history') {
 	return `${pathname}${search ? `?${search}` : ''}`;
 }
 
-// 곡 하나(stats/works·stats/firsts 의 id)의 선곡 기록. period 는 statPeriod.js 의 기간(전체 기간 또는 학기 id).
+// 대상 하나(id 필터 하나, 예: player_id)의 선곡 기록. period 는 statPeriod.js 의 기간(전체 기간 또는 학기 id).
 /**
- * @param {number | string} musicId
+ * @param {string} param
+ * @param {number | string} id
  * @param {string} [period]
  */
-export function workHistoryHref(musicId, period = ALL) {
+export function targetHistoryHref(param, id, period = ALL) {
 	return historyHref({
 		period: String(period),
 		start: '',
@@ -112,8 +113,17 @@ export function workHistoryHref(musicId, period = ALL) {
 		userId: null,
 		includeMentees: false,
 		requested: '',
-		targets: [{ param: 'music_id', id: String(musicId) }]
+		targets: [{ param, id: String(id) }]
 	});
+}
+
+// 곡 하나(stats/works·stats/firsts 의 id)의 선곡 기록.
+/**
+ * @param {number | string} musicId
+ * @param {string} [period]
+ */
+export function workHistoryHref(musicId, period = ALL) {
+	return targetHistoryHref('music_id', musicId, period);
 }
 
 // drill-down 패널의 곡 하나 → 선곡 기록의 id 필터: 그 패널의 대상과 그 곡. 곡의 작곡가는
