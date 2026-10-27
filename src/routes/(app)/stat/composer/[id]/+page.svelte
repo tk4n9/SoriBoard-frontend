@@ -6,6 +6,7 @@
 	import { horizontalBarOption, countBarOption } from '$lib/chartOptions.js';
 	import { rankTable } from '$lib/statTable.js';
 	import { WORKS_LIMIT } from '$lib/statDrill.js';
+	import { pageTitle } from '$lib/statTitle.js';
 	import {
 		readComposerId,
 		composerHistoryHref,
@@ -109,6 +110,10 @@
 		: '';
 	$: count = (v) => (v == null ? '—' : v.toLocaleString());
 </script>
+
+<svelte:head>
+	<title>{pageTitle(composer?.name, '작곡가')}</title>
+</svelte:head>
 
 <div class="composer-page">
 	<header class="page-header">

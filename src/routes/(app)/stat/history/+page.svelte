@@ -195,6 +195,10 @@
 	$: hasMore = count !== null && offset < count;
 </script>
 
+<svelte:head>
+	<title>선곡 기록</title>
+</svelte:head>
+
 <div class="history-page">
 	<header class="page-header">
 		<div class="title-group">

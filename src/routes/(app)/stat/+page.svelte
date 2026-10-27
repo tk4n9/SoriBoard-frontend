@@ -330,6 +330,10 @@
 		historyHref({ ...historyFilter, target: { param: drill.param, id: String(drill.id) } });
 </script>
 
+<svelte:head>
+	<title>통계</title>
+</svelte:head>
+
 <div class="stat-page">
 	<header class="page-header">
 		<div class="title-group">

@@ -8,6 +8,7 @@
 	import { rankTable, formatCount } from '$lib/statTable.js';
 	import { sortSemesters, semesterLabel, periodRangeText } from '$lib/statPeriod.js';
 	import { composerHref } from '$lib/composerStats.js';
+	import { pageTitle } from '$lib/statTitle.js';
 	import {
 		reportHref,
 		pickSemester,
@@ -211,6 +212,10 @@
 		['orchestras', '오케스트라']
 	];
 </script>
+
+<svelte:head>
+	<title>{pageTitle(label, '학기 결산')}</title>
+</svelte:head>
 
 <div class="report-page">
 	<header class="page-header">

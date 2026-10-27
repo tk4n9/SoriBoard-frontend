@@ -146,6 +146,10 @@
 	$: unknown = unknownCount(composers);
 </script>
 
+<svelte:head>
+	<title>작곡가 정리</title>
+</svelte:head>
+
 <div class="catalog-page">
 	<header class="page-header">
 		<div class="title-group">
