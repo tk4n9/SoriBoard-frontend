@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readStatQuery, statQueryHref } from '../../src/lib/statQuery.js';
+import { readStatQuery, statQueryHref, knownUser } from '../../src/lib/statQuery.js';
 
 const read = (search) => readStatQuery(new URLSearchParams(search));
 const href = (url, state) => statQueryHref(new URL(url, 'http://localhost'), state);
@@ -98,4 +98,21 @@ test('what is written reads back the same', () => {
 		const written = new URL(href('/stat', state), 'http://localhost');
 		assert.deepEqual(readStatQuery(written.searchParams), state);
 	}
+});
+
+test('a 지기 id that is in the 지기 list is kept', () => {
+	const users = [{ id: 1 }, { id: 12 }];
+	assert.equal(knownUser('12', users), '12');
+	assert.equal(knownUser(12, users), 12);
+});
+
+test('a 지기 id that is not in the 지기 list falls back to no 지기', () => {
+	assert.equal(knownUser('9999', [{ id: 1 }, { id: 12 }]), null);
+	assert.equal(knownUser('12', []), null);
+});
+
+test('no 지기, or no 지기 list, is left as it is', () => {
+	assert.equal(knownUser(null, [{ id: 1 }]), null);
+	assert.equal(knownUser('12', null), '12');
+	assert.equal(knownUser('12', { message: 'Error' }), '12');
 });

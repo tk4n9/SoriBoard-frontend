@@ -32,3 +32,14 @@ export function statQueryHref(url, { scope, userId, includeMentees }) {
 	const search = params.toString();
 	return `${url.pathname}${search ? `?${search}` : ''}${url.hash}`;
 }
+
+// 지기 목록에 없는 지기 id 는 지기 없음(null)으로 읽는다(백엔드는 모르는 지기를 0곡으로 센다).
+// 학기의 knownPeriod(statPeriod.js)와 같다. 목록을 받지 못했으면(배열이 아니면) 그대로 둔다.
+/**
+ * @param {string | number | null} userId
+ * @param {{ id: number }[] | null | undefined} users
+ */
+export function knownUser(userId, users) {
+	if (userId == null || !Array.isArray(users)) return userId;
+	return users.some((u) => String(u.id) === String(userId)) ? userId : null;
+}

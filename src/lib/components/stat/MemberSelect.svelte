@@ -1,5 +1,6 @@
 <script>
 	import { onMount, createEventDispatcher } from 'svelte';
+	import { knownUser } from '$lib/statQuery.js';
 
 	export let userId = null;
 	export let includeMentees = false;
@@ -17,6 +18,13 @@
 		} catch (e) {
 			console.error('지기 목록을 불러오지 못했습니다.', e);
 			alert('지기 목록을 불러오지 못했습니다.');
+			return;
+		}
+		// 링크의 지기가 목록에 없으면 지기를 고르지 않은 것으로 되돌린다(목록을 못 받으면 그대로 둔다).
+		const known = knownUser(userId, users);
+		if (known !== userId) {
+			userId = known;
+			dispatch('change', { userId, includeMentees });
 		}
 	});
 
