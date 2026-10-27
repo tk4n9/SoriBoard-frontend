@@ -1,7 +1,7 @@
 <script>
 	import EChart from './EChart.svelte';
 	import DataTable from './DataTable.svelte';
-	import { seriesTable } from '$lib/statTable.js';
+	import { seriesTable, chartLabel } from '$lib/statTable.js';
 	import { downloadCsv, downloadDataUrl, todayStamp } from '$lib/csv.js';
 	import { downloadCsvTable } from '$lib/csvTable.js';
 
@@ -88,7 +88,12 @@
 			<div class="placeholder">데이터가 없습니다</div>
 		{:else}
 			<div class="chart-view" class:hidden={showTable && shownTable}>
-				<EChart bind:this={chartRef} {option} on:itemclick />
+				<EChart
+					bind:this={chartRef}
+					{option}
+					label={chartLabel(title, option?.title?.subtext ?? '')}
+					on:itemclick
+				/>
 			</div>
 			{#if showTable && shownTable}
 				<DataTable

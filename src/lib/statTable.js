@@ -101,3 +101,15 @@ export function seriesTable(labels, labelHeader, series) {
 		])
 	};
 }
+
+// 차트(캔버스)의 접근 가능한 이름: 제목·부제는 캔버스에만 그려지므로 화면 낭독기에 따로 알리고,
+// 수치는 '표로 보기'에 있다고 안내한다.
+/**
+ * @param {string} title
+ * @param {string} [subtitle]
+ */
+export function chartLabel(title, subtitle = '') {
+	const name = `${title.trim()} 차트`.trim();
+	const sub = subtitle.trim();
+	return `${sub ? `${name} — ${sub}` : name}. 수치는 '표로 보기'에서 볼 수 있습니다.`;
+}

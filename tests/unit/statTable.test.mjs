@@ -7,7 +7,8 @@ import {
 	shareTable,
 	seriesTable,
 	formatCount,
-	formatEvenness
+	formatEvenness,
+	chartLabel
 } from '../../src/lib/statTable.js';
 
 test('equal counts share a rank and the next rank skips', () => {
@@ -80,4 +81,16 @@ test('a series without a format counts', () => {
 	assert.deepEqual(table.rows, [['2025-1학기', '1,908']]);
 	assert.equal(formatCount(null), '—');
 	assert.equal(formatCount(0), '0');
+});
+
+test('a chart is named by its title and subtitle and points to the table', () => {
+	assert.equal(
+		chartLabel('많이 튼 작곡가', '전체 · 총 120곡'),
+		"많이 튼 작곡가 차트 — 전체 · 총 120곡. 수치는 '표로 보기'에서 볼 수 있습니다."
+	);
+	assert.equal(
+		chartLabel(' 월별 선곡 수 ', '  '),
+		"월별 선곡 수 차트. 수치는 '표로 보기'에서 볼 수 있습니다."
+	);
+	assert.equal(chartLabel('', ''), "차트. 수치는 '표로 보기'에서 볼 수 있습니다.");
 });

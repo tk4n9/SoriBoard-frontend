@@ -3,6 +3,8 @@
 	import { onMount, onDestroy, createEventDispatcher } from 'svelte';
 
 	export let option = null;
+	// 주면 화면 낭독기가 차트를 이 이름의 그림으로 읽는다(캔버스에 그린 제목은 읽지 못한다).
+	export let label = '';
 
 	let el;
 	let chart;
@@ -59,7 +61,12 @@
 	}
 </script>
 
-<div class="echart" bind:this={el}></div>
+<div
+	class="echart"
+	bind:this={el}
+	role={label ? 'img' : undefined}
+	aria-label={label || undefined}
+></div>
 
 <style>
 	.echart {
