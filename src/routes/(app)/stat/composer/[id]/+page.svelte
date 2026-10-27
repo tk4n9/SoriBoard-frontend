@@ -97,6 +97,8 @@
 	afterNavigate(loadAll);
 
 	$: title = composer ? composer.name : composerError ? `작곡가 #${composerId}` : '작곡가';
+	// 내려받는 파일 이름에 작곡가를 넣는다(이름을 못 받았으면 '작곡가 #id').
+	$: fileTag = composer ? composer.name : `작곡가 #${composerId}`;
 	$: subtitleFor = (envelope) =>
 		envelope ? `전체 기간 · 총 ${envelope.total_plays.toLocaleString()}곡` : '';
 	$: timelineData = semesterSeries(timeline);
@@ -183,6 +185,7 @@
 					data={timelineData}
 					loading={loading.timeline}
 					error={errors.timeline}
+					{fileTag}
 					csvHeaders={['학기', '횟수']}
 				/>
 				<!-- 곡은 처음·마지막 날짜까지 보이도록 차트 없이 표로만 -->
@@ -208,6 +211,7 @@
 					data={soloists}
 					loading={loading.soloists}
 					error={errors.soloists}
+					{fileTag}
 					table={soloists && rankTable(soloists, '연주자')}
 					links={soloistLinks}
 					on:itemclick={(e) => openBar(soloistLinks, e)}
@@ -219,6 +223,7 @@
 					data={conductors}
 					loading={loading.conductors}
 					error={errors.conductors}
+					{fileTag}
 					table={conductors && rankTable(conductors, '지휘자')}
 					links={conductorLinks}
 					on:itemclick={(e) => openBar(conductorLinks, e)}

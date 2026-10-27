@@ -8,6 +8,7 @@
 	import { currentSemesterRange } from '$lib/statPeriod.js';
 	import { downloadCsvTable } from '$lib/csvTable.js';
 	import { todayStamp } from '$lib/csv.js';
+	import { downloadName, memberFileText } from '$lib/statFileName.js';
 	import {
 		EXPORT_PAGE_SIZE,
 		PLAY_CSV_HEADERS,
@@ -175,9 +176,20 @@
 	let exported = 0; // 받은 선곡 수
 	let exportTotal = 0;
 	let exportError = '';
+	let userName = ''; // 고른 지기의 이름(MemberSelect)
 
 	async function exportCsv() {
 		const wanted = filter();
+		// 파일 이름에 누른 때의 기간과 지기를 넣는다(statFileName.js).
+		const filename = downloadName(
+			[
+				'선곡기록',
+				periodText,
+				memberFileText({ userId, name: userName, includeMentees }),
+				todayStamp()
+			],
+			'csv'
+		);
 		exporting = true;
 		exported = 0;
 		exportTotal = count ?? 0;
@@ -196,7 +208,7 @@
 					exportTotal = total;
 				}
 			);
-			downloadCsvTable(`선곡기록_${todayStamp()}.csv`, PLAY_CSV_HEADERS, plays.map(playCsvRow));
+			downloadCsvTable(filename, PLAY_CSV_HEADERS, plays.map(playCsvRow));
 		} catch (e) {
 			console.error('선곡 기록 CSV 저장 실패', e);
 			exportError = 'CSV를 만들지 못했습니다.';
@@ -279,6 +291,7 @@
 			<MemberSelect
 				bind:userId
 				bind:includeMentees
+				bind:userName
 				emptyLabel="전체 지기"
 				on:change={onMemberChange}
 			/>

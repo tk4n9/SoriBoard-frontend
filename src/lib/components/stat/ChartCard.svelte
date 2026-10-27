@@ -4,6 +4,7 @@
 	import { seriesTable, chartLabel } from '$lib/statTable.js';
 	import { downloadCsv, downloadDataUrl, todayStamp } from '$lib/csv.js';
 	import { downloadCsvTable } from '$lib/csvTable.js';
+	import { downloadName } from '$lib/statFileName.js';
 
 	export let title = '';
 	export let option = null; // ECharts option (제목/부제 포함)
@@ -18,6 +19,8 @@
 	export let rowLabel = ''; // 주면 표의 이름 칸이 단추가 된다(예: '곡 보기', DataTable 의 rowselect).
 	/** @type {(string | null)[]} */
 	export let links = []; // 주면 표의 이름 칸이 그 주소로 가는 링크가 된다(행마다, DataTable 의 links).
+	/** @type {string | string[]} */
+	export let fileTag = ''; // 내려받는 파일 이름에서 제목 뒤에 붙는 보기(기간, 지기 등, statFileName.js)
 
 	let chartRef;
 	// 표로 보기: 캔버스는 키보드·화면 낭독기로 읽을 수 없으므로 같은 수치를 표로 보인다.
@@ -35,12 +38,12 @@
 
 	function exportPng() {
 		const url = chartRef && chartRef.getPng();
-		if (url) downloadDataUrl(`통계_${title}_${todayStamp()}.png`, url);
+		if (url) downloadDataUrl(downloadName(['통계', title, fileTag, todayStamp()], 'png'), url);
 	}
 
 	function exportCsv() {
 		if (!hasData) return;
-		const filename = `통계_${title}_${todayStamp()}.csv`;
+		const filename = downloadName(['통계', title, fileTag, todayStamp()], 'csv');
 		if (csv) downloadCsvTable(filename, csv.headers, csv.rows);
 		else downloadCsv(filename, data.labels, data.values, csvHeaders);
 	}

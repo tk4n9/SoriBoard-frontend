@@ -6,6 +6,8 @@
 	export let includeMentees = false;
 	// 지기를 고르지 않은 때의 항목 이름(선곡 기록에서는 '전체 지기').
 	export let emptyLabel = '지기 선택';
+	// 고른 지기의 이름(읽기 전용, 내려받는 파일 이름용). 목록을 못 받았거나 고르지 않았으면 ''.
+	export let userName = '';
 
 	const dispatch = createEventDispatcher();
 	const errorId = 'member-list-error';
@@ -30,6 +32,8 @@
 			dispatch('change', { userId, includeMentees });
 		}
 	});
+
+	$: userName = users.find((user) => String(user.id) === String(userId))?.name ?? '';
 
 	function onUserChange(e) {
 		userId = e.target.value || null;

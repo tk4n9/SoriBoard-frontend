@@ -47,6 +47,7 @@
 	import { historyHref, drillWorkTargets } from '$lib/playHistory.js';
 	import { composerHref } from '$lib/composerStats.js';
 	import { reportHref } from '$lib/semesterReport.js';
+	import { memberFileText } from '$lib/statFileName.js';
 
 	// 범위·지기·견습 포함·기간·주별/월별·열린 drill-down 패널은 URL에도 둔다(링크로 같은 보기를 연다). 페이지가 시작될 때 한 번만 읽는다.
 	const initial = readStatQuery($page.url.searchParams);
@@ -292,6 +293,12 @@
 		appliedFilters && (appliedFilters.start || appliedFilters.end)
 			? { start: appliedFilters.start ?? '', end: appliedFilters.end ?? '' }
 			: { start: startDate, end: endDate };
+	// 내려받는 파일 이름에 넣을 보기: 머리말의 기간과, 개인이면 지기(statFileName.js).
+	let userName = '';
+	$: fileTag = [
+		periodText,
+		scope === 'individual' ? memberFileText({ userId, name: userName, includeMentees }) : ''
+	];
 	$: subtitleFor = (envelope) =>
 		envelope ? `${scopeLabel} · 총 ${envelope.total_plays.toLocaleString()}곡` : '';
 
@@ -396,7 +403,7 @@
 			/>
 			<ScopeToggle bind:scope on:change={onScopeChange} />
 			{#if scope === 'individual'}
-				<MemberSelect bind:userId bind:includeMentees on:change={onMemberChange} />
+				<MemberSelect bind:userId bind:includeMentees bind:userName on:change={onMemberChange} />
 			{/if}
 		</div>
 	</header>
@@ -464,6 +471,7 @@
 				data={composers}
 				loading={loading.composers}
 				error={errors.composers}
+				{fileTag}
 				rowLabel="곡 보기"
 				on:itemclick={(e) => openBar('composers', e)}
 				on:rowselect={(e) => openDrill('composers', e.detail)}
@@ -476,6 +484,7 @@
 				data={soloists}
 				loading={loading.soloists}
 				error={errors.soloists}
+				{fileTag}
 				rowLabel="곡 보기"
 				on:itemclick={(e) => openBar('soloists', e)}
 				on:rowselect={(e) => openDrill('soloists', e.detail)}
@@ -488,6 +497,7 @@
 				data={conductors}
 				loading={loading.conductors}
 				error={errors.conductors}
+				{fileTag}
 				rowLabel="곡 보기"
 				on:itemclick={(e) => openBar('conductors', e)}
 				on:rowselect={(e) => openDrill('conductors', e.detail)}
@@ -500,6 +510,7 @@
 				data={orchestras}
 				loading={loading.orchestras}
 				error={errors.orchestras}
+				{fileTag}
 				rowLabel="곡 보기"
 				on:itemclick={(e) => openBar('orchestras', e)}
 				on:rowselect={(e) => openDrill('orchestras', e.detail)}
@@ -512,6 +523,7 @@
 				data={eras}
 				loading={loading.eras}
 				error={errors.eras}
+				{fileTag}
 				note={eraNote}
 				noteLink={{ href: '/stat/composers', text: '작곡가 정리' }}
 				table={eras && shareTable(eras, '시대')}
@@ -523,6 +535,7 @@
 				data={genres}
 				loading={loading.genres}
 				error={errors.genres}
+				{fileTag}
 				table={genres && shareTable(genres, '장르')}
 				csvHeaders={['장르', '횟수']}
 			/>
@@ -532,6 +545,7 @@
 				data={timelineData}
 				loading={loading.timeline}
 				error={errors.timeline}
+				{fileTag}
 				csvHeaders={['기간', '횟수']}
 			/>
 		</div>
@@ -600,6 +614,7 @@
 				data={countData}
 				loading={loading.diversity}
 				error={errors.diversity}
+				{fileTag}
 				csvHeaders={['기간', '선곡수']}
 			/>
 			<ChartCard
@@ -609,6 +624,7 @@
 				table={diversityTable}
 				loading={loading.diversity}
 				error={errors.diversity}
+				{fileTag}
 				csv={diversityCsv}
 			/>
 		</div>
