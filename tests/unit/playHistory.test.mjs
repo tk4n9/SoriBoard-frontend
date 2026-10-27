@@ -557,6 +557,15 @@ test('targetHistoryHref opens the plays of one 독주자 (or other id filter), i
 		period: '2',
 		targets: [{ param: 'player_id', id: '5' }]
 	});
+	// 학기 결산의 지휘자·오케스트라도 같은 id 필터로 간다.
+	assert.equal(
+		targetHistoryHref('conductor_id', 6, '2'),
+		'/stat/history?semester_id=2&conductor_id=6'
+	);
+	assert.equal(
+		targetHistoryHref('orchestra_id', 1, '2'),
+		'/stat/history?semester_id=2&orchestra_id=1'
+	);
 	// 곡 하나는 workHistoryHref 와 같다.
 	assert.equal(targetHistoryHref('music_id', 20, '3'), workHistoryHref(20, '3'));
 	// 선곡 기록이 모르는 파라미터는 쓰지 않는다.

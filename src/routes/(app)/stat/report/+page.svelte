@@ -51,6 +51,8 @@
 		composers: () => getJson('composers', semester.id, { limit: '10' }),
 		soloists: () => getJson('soloists', semester.id, { limit: '10' }),
 		works: () => getJson('works', semester.id, { limit: '10' }),
+		conductors: () => getJson('conductors', semester.id, { limit: '10' }),
+		orchestras: () => getJson('orchestras', semester.id, { limit: '10' }),
 		eras: () => withPrevious('eras'),
 		genres: () => withPrevious('genres'),
 		firstComposers: () => getJson('firsts', semester.id, { kind: 'composer' }),
@@ -64,7 +66,18 @@
 	let loading = Object.fromEntries(CARD_KEYS.map((key) => [key, true]));
 	/** @type {Record<string, string>} */
 	let errors = {};
-	$: ({ summary, composers, soloists, works, eras, genres, firstComposers, firstWorks } = data);
+	$: ({
+		summary,
+		composers,
+		soloists,
+		works,
+		conductors,
+		orchestras,
+		eras,
+		genres,
+		firstComposers,
+		firstWorks
+	} = data);
 
 	// 다른 학기로 바꾸면 이전 학기의 늦은 응답은 버린다.
 	let generation = 0;
@@ -129,18 +142,19 @@
 	const count = (v) => (v == null ? '—' : formatCount(v));
 	$: empty = summary && summary.total_plays === 0;
 
-	// 순위 표(상위 10). 작곡가 이름은 작곡가 페이지로, 독주자·곡 이름은 이 학기에 그 독주자·곡을 튼
-	// 선곡 기록으로 간다.
+	// 순위 표(상위 10). 작곡가 이름은 작곡가 페이지로, 독주자·지휘자·오케스트라·곡 이름은 이 학기에
+	// 그 대상·곡을 튼 선곡 기록으로 간다.
 	const linksOf = (envelope) =>
 		envelope ? envelope.items.map((item) => composerHref(item.id)) : [];
 	const workLinksOf = (envelope, semesterId) =>
 		envelope && semesterId
 			? envelope.items.map((item) => workHistoryHref(item.id, semesterId))
 			: [];
-	const soloistLinksOf = (envelope, semesterId) =>
+	// card: 'soloists' | 'conductors' | 'orchestras' (선곡 기록의 id 필터는 DRILL_CARDS 의 것).
+	const performerLinksOf = (card, envelope, semesterId) =>
 		envelope && semesterId
 			? envelope.items.map((item) =>
-					targetHistoryHref(DRILL_CARDS.soloists.param, item.id, semesterId)
+					targetHistoryHref(DRILL_CARDS[card].param, item.id, semesterId)
 				)
 			: [];
 	$: semesterId = semester ? String(semester.id) : '';
@@ -155,7 +169,7 @@
 			key: 'soloists',
 			title: '많이 튼 독주자',
 			table: soloists?.labels.length ? rankTable(soloists, '연주자') : null,
-			links: soloistLinksOf(soloists, semesterId)
+			links: performerLinksOf('soloists', soloists, semesterId)
 		},
 		{
 			key: 'works',
@@ -163,6 +177,18 @@
 			table: works?.labels.length ? rankTable(works, '곡') : null,
 			links: workLinksOf(works, semesterId),
 			wide: true
+		},
+		{
+			key: 'conductors',
+			title: '많이 튼 지휘자',
+			table: conductors?.labels.length ? rankTable(conductors, '지휘자') : null,
+			links: performerLinksOf('conductors', conductors, semesterId)
+		},
+		{
+			key: 'orchestras',
+			title: '많이 튼 오케스트라',
+			table: orchestras?.labels.length ? rankTable(orchestras, '오케스트라') : null,
+			links: performerLinksOf('orchestras', orchestras, semesterId)
 		}
 	];
 
