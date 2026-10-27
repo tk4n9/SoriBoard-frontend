@@ -60,6 +60,7 @@
 	let loading = false;
 	let error = '';
 	// 가장 최근 요청의 응답만 반영한다. 필터를 바꾸면 진행 중인 '더 보기'의 응답도 버린다.
+	// 응답을 반영했으면(성공이든 실패든) true 를 돌려준다.
 	let requestId = 0;
 
 	async function load(more = false) {
@@ -75,17 +76,33 @@
 			const res = await fetch(`/api/plays?${playsParams(filter(), current, offset)}`);
 			if (!res.ok) throw new Error(`plays ${res.status}`);
 			const result = await res.json();
-			if (id !== requestId) return;
+			if (id !== requestId) return false;
 			rows = appendPage(rows, result.results);
 			offset += result.results.length;
 			count = result.count;
 		} catch (e) {
-			if (id !== requestId) return;
+			if (id !== requestId) return false;
 			console.error('선곡 기록 로딩 실패', e);
 			error = '불러오지 못했습니다';
 		} finally {
 			if (id === requestId) loading = false;
 		}
+		return true;
+	}
+
+	// '더 보기'는 불러오는 동안 비활성이 되고, 다 받으면 사라지거나 '다시 시도'로 바뀌어 포커스를 잃는다.
+	// 그래서 새로 온 첫 행의 타임 링크로(실패하면 '다시 시도'로) 포커스를 옮긴다. 그 사이 다른 곳을
+	// 골랐거나 필터를 바꿨으면 그대로 둔다.
+	let listCard;
+	let moreBar;
+	async function loadMore() {
+		const first = rows.length;
+		if (!(await load(true))) return;
+		await tick();
+		const active = document.activeElement;
+		if (active && active !== document.body && !moreBar?.contains(active)) return;
+		const row = error ? null : listCard?.querySelectorAll('tbody tr')[first];
+		(row?.querySelector('a') ?? moreBar?.querySelector('button'))?.focus();
 	}
 
 	// 필터가 바뀌면 URL을 바꾸고(히스토리를 쌓지 않고, 포커스·스크롤도 그대로) 처음부터 다시 부른다.
@@ -294,7 +311,7 @@
 		</div>
 	</div>
 
-	<section class="card" aria-label="선곡 목록">
+	<section class="card" aria-label="선곡 목록" bind:this={listCard}>
 		{#if rows.length > 0}
 			<PlayTable {rows} />
 		{:else if loading}
@@ -310,12 +327,12 @@
 	</section>
 
 	{#if rows.length > 0}
-		<div class="more">
+		<div class="more" bind:this={moreBar}>
 			{#if error}
 				<span class="more-error">더 불러오지 못했습니다.</span>
-				<button class="tool-btn" on:click={() => load(true)}>다시 시도</button>
+				<button class="tool-btn" on:click={loadMore}>다시 시도</button>
 			{:else if hasMore}
-				<button class="tool-btn" on:click={() => load(true)} disabled={loading}>
+				<button class="tool-btn" on:click={loadMore} disabled={loading}>
 					{loading ? '불러오는 중...' : '더 보기'}
 				</button>
 				<span class="more-count">{rows.length.toLocaleString()} / {count.toLocaleString()}</span>
