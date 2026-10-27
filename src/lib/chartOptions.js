@@ -64,6 +64,10 @@ function titleBlock(title, subtitle) {
 
 const BASE_TEXT_STYLE = { fontFamily: FONT, color: TEXT };
 
+// 라인 차트(boundaryGap: false)의 첫·마지막 x 이름표는 양 끝 점 가운데에 놓여 절반이 캔버스 밖으로
+// 잘린다('2026-2학기', '2026-10-19'). 끝 이름표만 안쪽으로 붙여 정렬한다.
+const EDGE_LABELS_INSIDE = { alignMinLabel: 'left', alignMaxLabel: 'right' };
+
 // 가로 막대 (top-N): composers / works / conductors / orchestras 공용.
 export function horizontalBarOption({ labels, values }, title, subtitle) {
 	// ECharts category 축은 아래에서 위로 그려지므로 역순으로 넣어 1위가 맨 위로.
@@ -115,7 +119,7 @@ export function timelineOption({ labels, values }, title, subtitle) {
 			data: labels,
 			boundaryGap: false,
 			axisLine: AXIS_LINE,
-			axisLabel: { fontFamily: FONT, color: TEXT }
+			axisLabel: { fontFamily: FONT, color: TEXT, ...EDGE_LABELS_INSIDE }
 		},
 		yAxis: {
 			type: 'value',
@@ -180,10 +184,11 @@ export function diversityLineOption(labels, series, title, subtitle) {
 		title: titleBlock(title, subtitle),
 		textStyle: BASE_TEXT_STYLE,
 		color: CATEGORICAL,
-		grid: { left: 8, right: 16, top: subtitle ? 86 : 72, bottom: 24, containLabel: true },
+		// 범례는 부제(위에서 약 45~62px) 밑에 둔다. 48 이면 부제 위에 겹친다.
+		grid: { left: 8, right: 16, top: subtitle ? 104 : 72, bottom: 24, containLabel: true },
 		tooltip: { trigger: 'axis', axisPointer: LINE_POINTER, ...TOOLTIP_BOX },
 		legend: {
-			top: subtitle ? 48 : 34,
+			top: subtitle ? 66 : 34,
 			inactiveColor: GRID,
 			inactiveBorderColor: GRID,
 			itemStyle: { borderColor: OUTLINE, borderWidth: 1 },
@@ -194,7 +199,7 @@ export function diversityLineOption(labels, series, title, subtitle) {
 			data: labels,
 			boundaryGap: false,
 			axisLine: AXIS_LINE,
-			axisLabel: { fontFamily: FONT, color: TEXT, hideOverlap: true }
+			axisLabel: { fontFamily: FONT, color: TEXT, hideOverlap: true, ...EDGE_LABELS_INSIDE }
 		},
 		yAxis: {
 			type: 'value',
