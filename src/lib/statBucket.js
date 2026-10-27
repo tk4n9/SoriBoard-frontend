@@ -39,6 +39,22 @@ export function chooseTimelineBucket({ period, start, end }, diversityBucket, to
 	return diversityBucket === 'week' ? 'month' : 'week';
 }
 
+// 다양성 섹션의 주별/월별 토글은 URL의 bucket 에 둔다(링크로 같은 보기를 연다).
+// 기본값 월별은 URL에 남기지 않고, week 가 아닌 값은 월별로 읽는다.
+/** @param {URLSearchParams} params */
+export function readDiversityBucket(params) {
+	return params.get('bucket') === 'week' ? 'week' : 'month';
+}
+
+/**
+ * @param {URLSearchParams} params
+ * @param {string} bucket 'week' | 'month'
+ */
+export function writeDiversityBucket(params, bucket) {
+	if (bucket === 'week') params.set('bucket', 'week');
+	else params.delete('bucket');
+}
+
 const BUCKET_NAMES = { week: '주별', month: '월별', semester: '학기별' };
 
 /** @param {string} bucket */

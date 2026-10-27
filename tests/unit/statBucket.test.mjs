@@ -5,7 +5,9 @@ import {
 	spansSemesters,
 	chooseTimelineBucket,
 	timelineBucketName,
-	timelineView
+	timelineView,
+	readDiversityBucket,
+	writeDiversityBucket
 } from '../../src/lib/statBucket.js';
 
 const TODAY = '2026-10-26';
@@ -86,4 +88,28 @@ test('학기 labels read as 학기; week and month labels stay', () => {
 	assert.deepEqual(semester.labels, ['2025-1', '2025-2']);
 	const month = { filters: { bucket: 'month' }, labels: ['2026-09'], values: [5] };
 	assert.equal(timelineView(month), month);
+});
+
+const readBucket = (search) => readDiversityBucket(new URLSearchParams(search));
+
+test('the 주별/월별 toggle reads week from the URL, anything else as 월별', () => {
+	assert.equal(readBucket(''), 'month');
+	assert.equal(readBucket('bucket=week'), 'week');
+	assert.equal(readBucket('bucket=month'), 'month');
+	for (const bad of ['bucket=day', 'bucket=semester', 'bucket=WEEK', 'bucket=']) {
+		assert.equal(readBucket(bad), 'month', bad);
+	}
+});
+
+test('writing the toggle leaves 월별 out of the URL and keeps the other keys', () => {
+	const params = new URLSearchParams('period=all&scope=individual&user_id=2');
+	writeDiversityBucket(params, 'week');
+	assert.equal(params.toString(), 'period=all&scope=individual&user_id=2&bucket=week');
+	assert.equal(readDiversityBucket(params), 'week');
+	writeDiversityBucket(params, 'month');
+	assert.equal(params.toString(), 'period=all&scope=individual&user_id=2');
+	assert.equal(readDiversityBucket(params), 'month');
+	const stale = new URLSearchParams('bucket=day');
+	writeDiversityBucket(stale, 'month');
+	assert.equal(stale.toString(), '');
 });

@@ -17,7 +17,13 @@
 	import { readStatQuery, statQueryHref } from '$lib/statQuery.js';
 	import { createLatestRequests } from '$lib/latestRequest.js';
 	import { requestGroups, genreDistribution } from '$lib/statCards.js';
-	import { chooseTimelineBucket, timelineBucketName, timelineView } from '$lib/statBucket.js';
+	import {
+		chooseTimelineBucket,
+		timelineBucketName,
+		timelineView,
+		readDiversityBucket,
+		writeDiversityBucket
+	} from '$lib/statBucket.js';
 	import { rankTable, shareTable, seriesTable, formatEvenness } from '$lib/statTable.js';
 	import { seriesCsv } from '$lib/csvTable.js';
 	import { barItemIndex, drillTarget, drillParams } from '$lib/statDrill.js';
@@ -35,7 +41,7 @@
 	import { composerHref } from '$lib/composerStats.js';
 	import { reportHref } from '$lib/semesterReport.js';
 
-	// 범위·지기·견습 포함·기간은 URL에도 둔다(링크로 같은 보기를 연다). 페이지가 시작될 때 한 번만 읽는다.
+	// 범위·지기·견습 포함·기간·주별/월별은 URL에도 둔다(링크로 같은 보기를 연다). 페이지가 시작될 때 한 번만 읽는다.
 	const initial = readStatQuery($page.url.searchParams);
 	let scope = initial.scope;
 	let userId = initial.userId;
@@ -49,6 +55,7 @@
 	function syncUrl() {
 		const url = new URL($page.url);
 		writeStatPeriod(url.searchParams, period, { start: customStart, end: customEnd });
+		writeDiversityBucket(url.searchParams, diversityBucket);
 		goto(statQueryHref(url, { scope, userId, includeMentees }), {
 			replaceState: true,
 			keepFocus: true,
@@ -59,7 +66,7 @@
 	// 기본 기간 = 가장 최근 학기의 시작일부터 오늘까지(선곡 기록과 같은 규칙, statPeriod.js).
 	let { start: startDate, end: endDate } = currentSemesterRange();
 
-	let diversityBucket = 'month'; // 'week' | 'month'
+	let diversityBucket = readDiversityBucket($page.url.searchParams); // 'week' | 'month'
 	// 기간별 선곡 추이의 단위: 한 학기를 넘으면 학기별, 아니면 토글이 보이지 않는 쪽(statBucket.js).
 	const nextTimelineBucket = () =>
 		chooseTimelineBucket(
@@ -236,6 +243,7 @@
 	function setDiversityBucket(b) {
 		if (diversityBucket === b) return;
 		diversityBucket = b;
+		syncUrl();
 		// 한 학기 이하면 기간별 선곡 추이도 반대 단위로 바뀌므로 함께 다시 부른다.
 		const next = nextTimelineBucket();
 		if (next === timelineBucket) load(['diversity']);
