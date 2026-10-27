@@ -19,7 +19,9 @@
 
 	const dispatch = createEventDispatcher();
 	const errorId = 'period-range-error';
+	const listErrorId = 'period-list-error';
 	let semesters = [];
+	let listError = '';
 	// 입력란의 값. '적용'을 누르고 범위가 맞을 때만 start·end 로 옮긴다.
 	let draftStart = start;
 	let draftEnd = end;
@@ -33,6 +35,7 @@
 			loaded = true;
 		} catch (e) {
 			console.error('학기 목록을 불러오지 못했습니다.', e);
+			listError = '학기 목록을 불러오지 못했습니다.';
 		}
 		// 링크의 학기가 목록에 없으면 이번 학기로 되돌린다(목록을 못 받으면 그대로 둔다).
 		const known = knownPeriod(period, loaded ? semesters : null);
@@ -52,6 +55,8 @@
 	}
 
 	$: error = rangeError({ start: draftStart, end: draftEnd });
+	// 직접 지정에서는 학기 목록을 쓰지 않고 그 아래 자리는 범위 문구가 쓰므로 숨긴다.
+	$: listNote = period === CUSTOM ? '' : listError;
 
 	function apply() {
 		if (error || (draftStart === start && draftEnd === end)) return;
@@ -62,7 +67,13 @@
 </script>
 
 <div class="period-select">
-	<select on:change={onChange} value={period} aria-label="기간">
+	<select
+		on:change={onChange}
+		value={period}
+		aria-label="기간"
+		aria-invalid={listNote ? 'true' : undefined}
+		aria-describedby={listNote ? listErrorId : undefined}
+	>
 		<option value={CURRENT}>이번 학기</option>
 		{#each semesters as semester}
 			<option value={String(semester.id)}>{semesterLabel(semester)}</option>
@@ -91,10 +102,12 @@
 			<p id={errorId} class="range-error" aria-live="polite">{error}</p>
 		</form>
 	{/if}
+	<p id={listErrorId} class="list-error" aria-live="polite">{listNote}</p>
 </div>
 
 <style>
 	.period-select {
+		position: relative;
 		display: inline-flex;
 		align-items: center;
 		gap: 10px;
@@ -112,6 +125,7 @@
 	input {
 		padding: 5px 8px;
 	}
+	select[aria-invalid='true'],
 	input[aria-invalid='true'] {
 		border-color: var(--danger-fg);
 	}
@@ -134,7 +148,8 @@
 		cursor: pointer;
 	}
 	/* 머리말 아래 여백에 띄워, 문구가 생겨도 머리말 높이가 바뀌지 않게 한다. */
-	.range-error {
+	.range-error,
+	.list-error {
 		position: absolute;
 		top: 100%;
 		left: 0;
@@ -143,5 +158,10 @@
 		font-family: var(--small-medium-font-family, 'Noto Sans KR', sans-serif);
 		font-size: var(--small-medium-font-size, 13px);
 		color: var(--danger-fg);
+	}
+	/* select 의 오른쪽 끝에 맞춰 왼쪽으로 펼친다: 바로 오른쪽 지기 select 의 문구와 겹치지 않게. */
+	.list-error {
+		left: auto;
+		right: 0;
 	}
 </style>

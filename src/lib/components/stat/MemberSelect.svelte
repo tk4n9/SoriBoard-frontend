@@ -8,7 +8,10 @@
 	export let emptyLabel = '지기 선택';
 
 	const dispatch = createEventDispatcher();
+	const errorId = 'member-list-error';
 	let users = [];
+	// 목록을 못 받으면 알림창 대신 select 아래에 짧게 적는다.
+	let listError = '';
 
 	onMount(async () => {
 		try {
@@ -17,7 +20,7 @@
 			users = await res.json();
 		} catch (e) {
 			console.error('지기 목록을 불러오지 못했습니다.', e);
-			alert('지기 목록을 불러오지 못했습니다.');
+			listError = '지기 목록을 불러오지 못했습니다.';
 			return;
 		}
 		// 링크의 지기가 목록에 없으면 지기를 고르지 않은 것으로 되돌린다(목록을 못 받으면 그대로 둔다).
@@ -39,7 +42,13 @@
 </script>
 
 <div class="member-select">
-	<select on:change={onUserChange} value={userId ?? ''} aria-label="지기">
+	<select
+		on:change={onUserChange}
+		value={userId ?? ''}
+		aria-label="지기"
+		aria-invalid={listError ? 'true' : undefined}
+		aria-describedby={listError ? errorId : undefined}
+	>
 		<option value="">{emptyLabel}</option>
 		{#each users as user}
 			<option value={String(user.id)}>{user.name} {user.major} {user.year_id}</option>
@@ -49,10 +58,12 @@
 		<input type="checkbox" checked={includeMentees} on:change={onMenteeChange} />
 		견습 포함
 	</label>
+	<p id={errorId} class="list-error" aria-live="polite">{listError}</p>
 </div>
 
 <style>
 	.member-select {
+		position: relative;
 		display: inline-flex;
 		align-items: center;
 		gap: 10px;
@@ -65,6 +76,9 @@
 		border-radius: 6px;
 		background: var(--secondary-secondary-50, #fffdfc);
 		color: var(--gray-gray-950, #1a1a1a);
+	}
+	select[aria-invalid='true'] {
+		border-color: var(--danger-fg);
 	}
 	.mentee input[type='checkbox'] {
 		appearance: none;
@@ -88,5 +102,16 @@
 		align-items: center;
 		gap: 4px;
 		cursor: pointer;
+	}
+	/* PeriodSelect 의 범위 문구처럼 머리말 아래 여백에 띄워, 머리말 높이가 바뀌지 않게 한다. */
+	.list-error {
+		position: absolute;
+		top: 100%;
+		left: 0;
+		margin: 2px 0 0;
+		white-space: nowrap;
+		font-family: var(--small-medium-font-family, 'Noto Sans KR', sans-serif);
+		font-size: var(--small-medium-font-size, 13px);
+		color: var(--danger-fg);
 	}
 </style>
