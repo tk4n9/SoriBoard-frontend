@@ -3,6 +3,7 @@
 	import DataTable from './DataTable.svelte';
 	import { rankTable } from '$lib/statTable.js';
 	import { WORKS_LIMIT, workLabel } from '$lib/statDrill.js';
+	import { closeOnEscape } from '$lib/escapeKey.js';
 
 	// 순위 카드의 막대·행에서 연 패널: 그 대상의 곡(stats/works, 같은 기간·범위).
 	/** @type {import('$lib/statDrill.js').DrillTarget} */
@@ -38,7 +39,14 @@
 		);
 </script>
 
-<section class="drill-panel" aria-label={title} tabindex="-1" bind:this={panel}>
+<!-- 포커스가 패널 안에 있으면 Escape 도 닫기와 같다. -->
+<section
+	class="drill-panel"
+	aria-label={title}
+	tabindex="-1"
+	bind:this={panel}
+	use:closeOnEscape={() => dispatch('close')}
+>
 	<div class="actions">
 		{#if composerLink}
 			<a class="history-link" href={composerLink}>작곡가 페이지</a>
@@ -48,7 +56,12 @@
 				{works.total_plays.toLocaleString()}곡 모두 보기
 			</a>
 		{/if}
-		<button class="tool-btn" on:click={() => dispatch('close')} aria-label={`${title} 닫기`}>
+		<button
+			class="tool-btn"
+			on:click={() => dispatch('close')}
+			aria-label={`${title} 닫기`}
+			aria-keyshortcuts="Escape"
+		>
 			닫기
 		</button>
 	</div>
