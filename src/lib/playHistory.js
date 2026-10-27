@@ -9,7 +9,8 @@ import {
 	CUSTOM,
 	readStatPeriod,
 	readStatRange,
-	writeStatPeriod
+	writeStatPeriod,
+	periodRangeText
 } from './statPeriod.js';
 import { DRILL_CARDS } from './statDrill.js';
 
@@ -166,6 +167,34 @@ export function targetName(envelope, target) {
 export function targetText(target, name) {
 	const noun = targetCard(target)?.[1].noun ?? '';
 	return name ? `${noun}: ${name}` : `${noun} #${target.id}`;
+}
+
+// 학기의 날짜 범위는 백엔드만 알고 plays/ 는 돌려주지 않으므로, 그 학기로 거른 stats/summary 의
+// filters 에서 읽는다. 그 요청의 쿼리. 학기가 아니면 null.
+/** @param {string} period */
+export function semesterRangeParams(period) {
+	if (period === CURRENT || period === ALL || period === CUSTOM) return null;
+	return new URLSearchParams({ semester_id: period });
+}
+
+// 머리말의 기간 문구(text)와 직접 지정을 고를 때 입력란에 채울 범위(shown). 학기는 받은
+// filters 가 그 학기의 것일 때만 날짜를 보이고, 그 전에는 문구가 비고 범위는 이번 학기다.
+/**
+ * @param {Pick<HistoryFilter, 'period' | 'start' | 'end'>} filter
+ * @param {{ start: string, end: string }} current
+ * @param {{ semester_id?: string, start?: string, end?: string } | null | undefined} semesterFilters
+ */
+export function historyPeriod(filter, current, semesterFilters) {
+	const { period } = filter;
+	if (period === CURRENT) return { text: periodRangeText(current), shown: current };
+	if (period === ALL) return { text: '전체 기간', shown: current };
+	if (period === CUSTOM) {
+		const custom = { start: filter.start, end: filter.end };
+		return { text: periodRangeText(custom), shown: custom };
+	}
+	const f = semesterFilters;
+	if (!f || f.semester_id !== period || !(f.start || f.end)) return { text: '', shown: current };
+	return { text: periodRangeText(f), shown: { start: f.start ?? '', end: f.end ?? '' } };
 }
 
 // 이미 받은 행 뒤에 다음 쪽을 붙인다. 그 사이에 새 선곡이 들어와 쪽이 밀리면 같은 선곡이 다시

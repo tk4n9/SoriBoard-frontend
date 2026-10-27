@@ -18,7 +18,9 @@ import {
 	performersText,
 	jigiText,
 	fetchAllPlays,
-	playCsvRow
+	playCsvRow,
+	semesterRangeParams,
+	historyPeriod
 } from '../../src/lib/playHistory.js';
 
 const read = (search) => readHistoryQuery(new URLSearchParams(search));
@@ -437,4 +439,40 @@ test('a play is one CSV row, one column per header', () => {
 		row.map((cell) => cell ?? ''),
 		['2026-10-23', 3, '', '', '', '', '', '', '', '', '']
 	);
+});
+
+test('semesterRangeParams asks stats/summary for a 학기 only', () => {
+	assert.equal(semesterRangeParams('7').toString(), 'semester_id=7');
+	for (const period of ['current', 'all', 'custom'])
+		assert.equal(semesterRangeParams(period), null);
+});
+
+test('historyPeriod: header text and the range 직접 지정 starts from', () => {
+	const current = { start: '2026-09-01', end: '2026-10-27' };
+	const at = (period, start = '', end = '') => ({ period, start, end });
+	assert.deepEqual(historyPeriod(at('current'), current, null), {
+		text: '2026-09-01 ~ 2026-10-27',
+		shown: current
+	});
+	assert.deepEqual(historyPeriod(at('all'), current, null), { text: '전체 기간', shown: current });
+	assert.deepEqual(historyPeriod(at('custom', '2025-01-01', ''), current, null), {
+		text: '2025-01-01 ~',
+		shown: { start: '2025-01-01', end: '' }
+	});
+
+	const second = { scope: 'all', semester_id: '1', start: '2025-09-01', end: '2026-02-28' };
+	assert.deepEqual(historyPeriod(at('1'), current, second), {
+		text: '2025-09-01 ~ 2026-02-28',
+		shown: { start: '2025-09-01', end: '2026-02-28' }
+	});
+	// 범위를 받기 전, 다른 학기의 범위, 백엔드가 모르는 학기(semester_id 없이 전체 기간)는 쓰지 않는다.
+	const blank = { text: '', shown: current };
+	assert.deepEqual(historyPeriod(at('1'), current, null), blank);
+	assert.deepEqual(historyPeriod(at('3'), current, second), blank);
+	assert.deepEqual(historyPeriod(at('99'), current, { scope: 'all' }), blank);
+	// 다른 기간에서는 학기의 범위를 무시한다.
+	assert.deepEqual(historyPeriod(at('all'), current, second), {
+		text: '전체 기간',
+		shown: current
+	});
 });

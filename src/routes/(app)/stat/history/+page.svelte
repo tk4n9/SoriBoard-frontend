@@ -5,7 +5,7 @@
 	import PeriodSelect from '$lib/components/stat/PeriodSelect.svelte';
 	import MemberSelect from '$lib/components/stat/MemberSelect.svelte';
 	import PlayTable from '$lib/components/stat/PlayTable.svelte';
-	import { CURRENT, ALL, CUSTOM, currentSemesterRange, periodRangeText } from '$lib/statPeriod.js';
+	import { currentSemesterRange } from '$lib/statPeriod.js';
 	import { downloadCsvTable } from '$lib/csvTable.js';
 	import { todayStamp } from '$lib/csv.js';
 	import {
@@ -20,7 +20,9 @@
 		playCsvRow,
 		targetLookup,
 		targetName,
-		targetText
+		targetText,
+		semesterRangeParams,
+		historyPeriod
 	} from '$lib/playHistory.js';
 
 	// 검색어·기간·지기·신청곡과 통계 drill-down 의 id 필터는 URL에 둔다(링크로 같은 목록을 연다).
@@ -107,9 +109,27 @@
 		}
 	}
 
+	// 학기를 고르면 머리말에 보일 그 학기의 날짜 범위(백엔드가 적용한 filters). 가장 최근 요청만 반영한다.
+	let semesterFilters = null;
+	let rangeRequestId = 0;
+	async function loadSemesterRange() {
+		const id = ++rangeRequestId;
+		const params = semesterRangeParams(period);
+		if (!params) return;
+		try {
+			const res = await fetch(`/api/stats/summary?${params}`);
+			if (!res.ok) throw new Error(`summary ${res.status}`);
+			const result = await res.json();
+			if (id === rangeRequestId) semesterFilters = result.filters;
+		} catch (e) {
+			console.error('선곡 기록 학기 범위 로딩 실패', e);
+		}
+	}
+
 	onMount(() => {
 		load();
 		loadTargetName();
+		loadSemesterRange();
 	});
 
 	function onSearch() {
@@ -120,6 +140,7 @@
 	const onPeriodChange = (e) => {
 		period = e.detail;
 		apply();
+		loadSemesterRange();
 	};
 	function onMemberChange(e) {
 		userId = e.detail.userId;
@@ -173,16 +194,12 @@
 		searchInput.focus();
 	}
 
-	$: periodText =
-		period === CURRENT
-			? periodRangeText(current)
-			: period === ALL
-				? '전체 기간'
-				: period === CUSTOM
-					? periodRangeText({ start: customStart, end: customEnd })
-					: '';
-	// 직접 지정을 고르면 입력란에 채울 범위(학기의 날짜는 모르므로 이번 학기).
-	$: shownRange = period === CUSTOM ? { start: customStart, end: customEnd } : current;
+	// 머리말의 기간과, 직접 지정을 고르면 입력란에 채울 범위(지금 보이는 기간, 전체 기간이면 이번 학기).
+	$: ({ text: periodText, shown: shownRange } = historyPeriod(
+		{ period, start: customStart, end: customEnd },
+		current,
+		semesterFilters
+	));
 	$: statLink = statHref({
 		period,
 		start: customStart,
