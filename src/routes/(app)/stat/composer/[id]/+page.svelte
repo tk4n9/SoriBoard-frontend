@@ -7,6 +7,7 @@
 	import { rankTable } from '$lib/statTable.js';
 	import { WORKS_LIMIT } from '$lib/statDrill.js';
 	import { pageTitle } from '$lib/statTitle.js';
+	import { workHistoryHref } from '$lib/playHistory.js';
 	import {
 		readComposerId,
 		composerHistoryHref,
@@ -105,6 +106,8 @@
 	$: conductorOpt =
 		conductors && horizontalBarOption(conductors, '많이 튼 지휘자', subtitleFor(conductors));
 	$: worksTable = works && works.items.length > 0 && composerWorksTable(works, composer);
+	// 곡 이름은 그 곡의 선곡 기록(전체 기간)으로 간다.
+	$: worksLinks = works ? works.items.map((item) => workHistoryHref(item.id)) : [];
 	$: worksSubtitle = works
 		? subtitleFor(works) + (works.items.length >= WORKS_LIMIT ? ` · 상위 ${WORKS_LIMIT}곡` : '')
 		: '';
@@ -182,7 +185,12 @@
 					{:else if !worksTable}
 						<div class="placeholder">데이터가 없습니다</div>
 					{:else}
-						<DataTable table={worksTable} title="많이 튼 곡" subtitle={worksSubtitle} />
+						<DataTable
+							table={worksTable}
+							title="많이 튼 곡"
+							subtitle={worksSubtitle}
+							links={worksLinks}
+						/>
 					{/if}
 				</section>
 				<ChartCard

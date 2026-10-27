@@ -6,6 +6,7 @@ import {
 	PLAY_CSV_HEADERS,
 	readHistoryQuery,
 	historyHref,
+	workHistoryHref,
 	statHref,
 	playsParams,
 	appendPage,
@@ -474,5 +475,20 @@ test('historyPeriod: header text and the range 직접 지정 starts from', () =>
 	assert.deepEqual(historyPeriod(at('all'), current, second), {
 		text: '전체 기간',
 		shown: current
+	});
+});
+
+test('workHistoryHref opens the plays of one work, all time or in one 학기', () => {
+	assert.equal(workHistoryHref(20), '/stat/history?period=all&music_id=20');
+	assert.equal(workHistoryHref('20', '3'), '/stat/history?semester_id=3&music_id=20');
+	assert.deepEqual(read(workHistoryHref(20, '3').split('?')[1]), {
+		...DEFAULT,
+		period: '3',
+		target: { param: 'music_id', id: '20' }
+	});
+	assert.deepEqual(read(workHistoryHref(20).split('?')[1]), {
+		...DEFAULT,
+		period: 'all',
+		target: { param: 'music_id', id: '20' }
 	});
 });

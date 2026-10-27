@@ -8,6 +8,7 @@
 	import { rankTable, formatCount } from '$lib/statTable.js';
 	import { sortSemesters, semesterLabel, periodRangeText } from '$lib/statPeriod.js';
 	import { composerHref } from '$lib/composerStats.js';
+	import { workHistoryHref } from '$lib/playHistory.js';
 	import { pageTitle } from '$lib/statTitle.js';
 	import {
 		reportHref,
@@ -127,9 +128,14 @@
 	const count = (v) => (v == null ? '—' : formatCount(v));
 	$: empty = summary && summary.total_plays === 0;
 
-	// 순위 표(상위 10). 작곡가 이름은 작곡가 페이지로 간다.
+	// 순위 표(상위 10). 작곡가 이름은 작곡가 페이지로, 곡 이름은 이 학기의 그 곡 선곡 기록으로 간다.
 	const linksOf = (envelope) =>
 		envelope ? envelope.items.map((item) => composerHref(item.id)) : [];
+	const workLinksOf = (envelope, semesterId) =>
+		envelope && semesterId
+			? envelope.items.map((item) => workHistoryHref(item.id, semesterId))
+			: [];
+	$: semesterId = semester ? String(semester.id) : '';
 	$: topCards = [
 		{
 			key: 'composers',
@@ -147,7 +153,7 @@
 			key: 'works',
 			title: '많이 튼 곡',
 			table: works?.labels.length ? rankTable(works, '곡') : null,
-			links: [],
+			links: workLinksOf(works, semesterId),
 			wide: true
 		}
 	];
@@ -188,18 +194,18 @@
 	];
 
 	// 처음 튼 작곡가·곡: 클럽 전체에서 처음 튼 날이 이 학기인 것.
-	const firstsCard = (key, title, firsts, nameHeader, unit) => ({
+	const firstsCard = (key, title, firsts, nameHeader, unit, semesterId) => ({
 		key,
 		title,
 		table: firsts?.items.length ? firstsTable(firsts, nameHeader) : null,
-		links: nameHeader === '작곡가' ? linksOf(firsts) : [],
+		links: nameHeader === '작곡가' ? linksOf(firsts) : workLinksOf(firsts, semesterId),
 		subtitle:
 			`클럽에서 이 학기에 처음 튼 ${nameHeader}` +
 			(firsts ? ` · ${firsts.items.length.toLocaleString()}${unit}` : '')
 	});
 	$: firstsCards = [
 		firstsCard('firstComposers', '처음 튼 작곡가', firstComposers, '작곡가', '명'),
-		firstsCard('firstWorks', '처음 튼 곡', firstWorks, '곡', '곡')
+		firstsCard('firstWorks', '처음 튼 곡', firstWorks, '곡', '곡', semesterId)
 	];
 
 	const KPIS = [

@@ -99,6 +99,24 @@ export function historyHref(filter, pathname = '/stat/history') {
 	return `${pathname}${search ? `?${search}` : ''}`;
 }
 
+// 곡 하나(stats/works·stats/firsts 의 id)의 선곡 기록. period 는 statPeriod.js 의 기간(전체 기간 또는 학기 id).
+/**
+ * @param {number | string} musicId
+ * @param {string} [period]
+ */
+export function workHistoryHref(musicId, period = ALL) {
+	return historyHref({
+		period: String(period),
+		start: '',
+		end: '',
+		q: '',
+		userId: null,
+		includeMentees: false,
+		requested: '',
+		target: { param: 'music_id', id: String(musicId) }
+	});
+}
+
 // 필터 → 같은 기간·지기의 통계 보기 경로(검색어, 신청곡과 id 필터는 통계에 없다).
 /** @param {HistoryFilter} filter */
 export function statHref(filter) {

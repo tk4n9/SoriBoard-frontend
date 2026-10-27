@@ -12,6 +12,9 @@
 	export let subtitle = '';
 	// 주면 행의 이름 칸이 단추가 되고, 누르면 그 행의 위치로 rowselect 를 알린다(drill-down).
 	export let rowLabel = '';
+	// 주면 행의 이름 칸이 그 주소로 가는 링크가 된다(행마다, 없는 행은 글자 그대로).
+	/** @type {(string | null)[]} */
+	export let links = [];
 
 	const dispatch = createEventDispatcher();
 
@@ -46,6 +49,10 @@
 										title={rowLabel}
 										on:click={() => dispatch('rowselect', r)}>{cell}</button
 									>
+								</th>
+							{:else if i === table.rowHeader && links[r]}
+								<th scope="row" class:numeric={table.columns[i].numeric}>
+									<a class="row-link" href={links[r]}>{cell}</a>
 								</th>
 							{:else if i === table.rowHeader}
 								<th scope="row" class:numeric={table.columns[i].numeric}>{cell}</th>
@@ -130,6 +137,15 @@
 		cursor: pointer;
 	}
 	.row-btn:hover {
+		text-decoration-thickness: 2px;
+	}
+	/* 다른 페이지로 가는 이름(선곡 기록 등)은 PlayTable 의 링크와 같게 */
+	.row-link {
+		color: inherit;
+		text-decoration-color: var(--gray-gray-500, #656667);
+		text-underline-offset: 3px;
+	}
+	.row-link:hover {
 		text-decoration-thickness: 2px;
 	}
 	/* 수치 칸은 내용만큼, 남는 폭은 이름 칸에 */
