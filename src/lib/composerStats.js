@@ -2,6 +2,7 @@
 // 이 페이지는 기간 없이 클럽의 전체 기록을 본다.
 import { ALL } from './statPeriod.js';
 import { historyHref } from './playHistory.js';
+import { DRILL_CARDS } from './statDrill.js';
 import { competitionRanks, formatCount } from './statTable.js';
 
 const ID = /^[1-9]\d*$/;
@@ -16,9 +17,12 @@ export function readComposerId(raw) {
 /** @param {number | string} id */
 export const composerHref = (id) => `/stat/composer/${id}`;
 
-// 이 작곡가의 선곡 기록(전체 기간).
-/** @param {number | string} id */
-export function composerHistoryHref(id) {
+// 이 작곡가의 선곡 기록(전체 기간). extra 를 주면 그 대상(예: 연주자)과 함께 튼 것만.
+/**
+ * @param {number | string} id
+ * @param {import('./playHistory.js').HistoryTarget[]} [extra]
+ */
+export function composerHistoryHref(id, extra = []) {
 	return historyHref({
 		period: ALL,
 		start: '',
@@ -27,8 +31,25 @@ export function composerHistoryHref(id) {
 		userId: null,
 		includeMentees: false,
 		requested: '',
-		targets: [{ param: 'composer_id', id: String(id) }]
+		targets: [{ param: 'composer_id', id: String(id) }, ...extra]
 	});
+}
+
+// 순위 카드(독주자·지휘자)의 항목마다 → 이 작곡가의 곡을 그 대상과 튼 선곡 기록. 이름이 아니라
+// id 로 거른다(이름은 겹칠 수 있다). id 가 없는 항목이나 drill-down 카드가 아니면 null.
+/**
+ * @param {number | string} composerId
+ * @param {string} card
+ * @param {{ items?: { id: number | null }[] } | null | undefined} envelope
+ * @returns {(string | null)[]}
+ */
+export function composerRankLinks(composerId, card, envelope) {
+	const spec = DRILL_CARDS[card];
+	return (envelope?.items ?? []).map((item) =>
+		spec && item.id != null
+			? composerHistoryHref(composerId, [{ param: spec.param, id: String(item.id) }])
+			: null
+	);
 }
 
 // 머리말의 '시대 · 출생 연도'. composers/<id>/ 의 era 는 출생 연도와 보정값으로 정한 시대다.

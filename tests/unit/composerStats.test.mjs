@@ -4,6 +4,7 @@ import {
 	readComposerId,
 	composerHref,
 	composerHistoryHref,
+	composerRankLinks,
 	composerFacts,
 	semesterSeries,
 	composerWorkName,
@@ -25,6 +26,40 @@ test('links: the composer page and its plays over all time', () => {
 	const query = readHistoryQuery(new URL(href, 'http://x').searchParams);
 	assert.equal(query.period, 'all');
 	assert.deepEqual(query.targets, [{ param: 'composer_id', id: '7' }]);
+});
+
+test('links: a 독주자 or 지휘자 with this composer, by id', () => {
+	const href = composerHistoryHref(7, [{ param: 'player_id', id: '3' }]);
+	assert.equal(href, '/stat/history?period=all&composer_id=7&player_id=3');
+	const query = readHistoryQuery(new URL(href, 'http://x').searchParams);
+	assert.deepEqual(query.targets, [
+		{ param: 'composer_id', id: '7' },
+		{ param: 'player_id', id: '3' }
+	]);
+
+	// Same name, different ids: each row keeps its own id; a row without an id gets no link.
+	const conductors = {
+		items: [
+			{ id: 5, name: '동명', count: 4 },
+			{ id: 6, name: '동명', count: 2 },
+			{ id: null, name: '미상', count: 1 }
+		]
+	};
+	assert.deepEqual(composerRankLinks('7', 'conductors', conductors), [
+		'/stat/history?period=all&composer_id=7&conductor_id=5',
+		'/stat/history?period=all&composer_id=7&conductor_id=6',
+		null
+	]);
+	assert.deepEqual(composerRankLinks(7, 'soloists', { items: [{ id: 2, name: 'a' }] }), [
+		'/stat/history?period=all&composer_id=7&player_id=2'
+	]);
+});
+
+test('links: nothing before the card loads, none for a card without an id filter', () => {
+	assert.deepEqual(composerRankLinks(7, 'soloists', null), []);
+	assert.deepEqual(composerRankLinks(7, 'soloists', undefined), []);
+	assert.deepEqual(composerRankLinks(7, 'soloists', { items: [] }), []);
+	assert.deepEqual(composerRankLinks(7, 'timeline', { items: [{ id: 1, name: 'a' }] }), [null]);
 });
 
 test('facts name the era and the birth year, or say they are unknown', () => {

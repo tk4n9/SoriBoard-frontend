@@ -16,6 +16,8 @@
 	export let error = ''; // 불러오기 실패 문구
 	export let table = null; // '표로 보기'의 표(statTable.js). 없으면 data 와 csvHeaders 로 만든다.
 	export let rowLabel = ''; // 주면 표의 이름 칸이 단추가 된다(예: '곡 보기', DataTable 의 rowselect).
+	/** @type {(string | null)[]} */
+	export let links = []; // 주면 표의 이름 칸이 그 주소로 가는 링크가 된다(행마다, DataTable 의 links).
 
 	let chartRef;
 	// 표로 보기: 캔버스는 키보드·화면 낭독기로 읽을 수 없으므로 같은 수치를 표로 보인다.
@@ -94,6 +96,7 @@
 					{title}
 					subtitle={option?.title?.subtext ?? ''}
 					{rowLabel}
+					{links}
 					on:rowselect
 				/>
 			{/if}

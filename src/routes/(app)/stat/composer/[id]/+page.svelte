@@ -1,16 +1,17 @@
 <script>
 	import { page } from '$app/stores';
-	import { afterNavigate } from '$app/navigation';
+	import { afterNavigate, goto } from '$app/navigation';
 	import ChartCard from '$lib/components/stat/ChartCard.svelte';
 	import DataTable from '$lib/components/stat/DataTable.svelte';
 	import { horizontalBarOption, countBarOption } from '$lib/chartOptions.js';
 	import { rankTable } from '$lib/statTable.js';
-	import { WORKS_LIMIT } from '$lib/statDrill.js';
+	import { WORKS_LIMIT, barItemIndex } from '$lib/statDrill.js';
 	import { pageTitle } from '$lib/statTitle.js';
 	import { workHistoryHref } from '$lib/playHistory.js';
 	import {
 		readComposerId,
 		composerHistoryHref,
+		composerRankLinks,
 		composerFacts,
 		semesterSeries,
 		composerWorksTable
@@ -108,6 +109,14 @@
 	$: worksTable = works && works.items.length > 0 && composerWorksTable(works, composer);
 	// 곡 이름은 그 곡의 선곡 기록(전체 기간)으로 간다.
 	$: worksLinks = works ? works.items.map((item) => workHistoryHref(item.id)) : [];
+	// 독주자·지휘자는 이 작곡가의 곡을 그 사람과 튼 선곡 기록으로 간다(표의 이름, 차트의 막대).
+	$: soloistLinks = composerRankLinks(composerId, 'soloists', soloists);
+	$: conductorLinks = composerRankLinks(composerId, 'conductors', conductors);
+	// 막대의 dataIndex 는 뒤집힌 순서다(horizontalBarOption).
+	function openBar(links, e) {
+		const href = links[barItemIndex(e.detail.dataIndex, links.length)];
+		if (href) goto(href);
+	}
 	$: worksSubtitle = works
 		? subtitleFor(works) + (works.items.length >= WORKS_LIMIT ? ` · 상위 ${WORKS_LIMIT}곡` : '')
 		: '';
@@ -200,6 +209,8 @@
 					loading={loading.soloists}
 					error={errors.soloists}
 					table={soloists && rankTable(soloists, '연주자')}
+					links={soloistLinks}
+					on:itemclick={(e) => openBar(soloistLinks, e)}
 					csvHeaders={['연주자', '횟수']}
 				/>
 				<ChartCard
@@ -209,6 +220,8 @@
 					loading={loading.conductors}
 					error={errors.conductors}
 					table={conductors && rankTable(conductors, '지휘자')}
+					links={conductorLinks}
+					on:itemclick={(e) => openBar(conductorLinks, e)}
 					csvHeaders={['지휘자', '횟수']}
 				/>
 			</div>
