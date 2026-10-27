@@ -24,7 +24,13 @@
 		readDiversityBucket,
 		writeDiversityBucket
 	} from '$lib/statBucket.js';
-	import { rankTable, shareTable, seriesTable, formatEvenness } from '$lib/statTable.js';
+	import {
+		rankTable,
+		shareTable,
+		seriesTable,
+		formatEvenness,
+		groupEvenness
+	} from '$lib/statTable.js';
 	import { seriesCsv } from '$lib/csvTable.js';
 	import {
 		barItemIndex,
@@ -592,11 +598,11 @@
 
 		<div class="kpi-row diversity-kpi">
 			<div class="kpi">
-				<div class="kpi-value">{diversity ? pct(diversity.summary.era.evenness) : '—'}</div>
+				<div class="kpi-value">{diversity ? pct(groupEvenness(diversity.summary.era)) : '—'}</div>
 				<div class="kpi-label">시대 다양성</div>
 			</div>
 			<div class="kpi">
-				<div class="kpi-value">{diversity ? pct(diversity.summary.genre.evenness) : '—'}</div>
+				<div class="kpi-value">{diversity ? pct(groupEvenness(diversity.summary.genre)) : '—'}</div>
 				<div class="kpi-label">장르 다양성</div>
 			</div>
 			<div class="kpi">

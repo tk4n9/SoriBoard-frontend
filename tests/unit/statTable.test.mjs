@@ -8,6 +8,7 @@ import {
 	seriesTable,
 	formatCount,
 	formatEvenness,
+	groupEvenness,
 	chartLabel
 } from '../../src/lib/statTable.js';
 
@@ -74,6 +75,25 @@ test('a series table has one column per series, each with its own format', () =>
 		['2026-09', '0.84', '0.60'],
 		['2026-10', '—', '0.61']
 	]);
+});
+
+test('a diversity group with counted plays keeps its evenness, even 0', () => {
+	assert.equal(
+		groupEvenness({ labels: ['고전', '근현대'], values: [1, 2], evenness: 0.3955 }),
+		0.3955
+	);
+	// one genre only: fully concentrated, a real 0
+	assert.equal(groupEvenness({ labels: ['교향곡'], values: [1], evenness: 0 }), 0);
+});
+
+test('a diversity group with nothing counted has no evenness', () => {
+	// no plays in the range
+	assert.equal(groupEvenness({ labels: [], values: [], evenness: 0 }), null);
+	// every play 시대 미상: summary.era is empty, the backend still says 0
+	assert.equal(groupEvenness({ labels: [], values: [], unknown_share: 1, evenness: 0 }), null);
+	assert.equal(groupEvenness({ labels: ['고전'], values: [0], evenness: 0 }), null);
+	assert.equal(groupEvenness(null), null);
+	assert.equal(groupEvenness(undefined), null);
 });
 
 test('a series without a format counts', () => {

@@ -14,6 +14,12 @@ export const formatCount = (v) => (v == null ? DASH : v.toLocaleString('ko-KR'))
 /** @param {number | null | undefined} v */
 export const formatEvenness = (v) => (v == null ? DASH : v.toFixed(2));
 
+// 다양성 응답의 summary.era·summary.genre → 그 고른정도. 센 선곡이 없으면(선곡이 없거나 모두
+// 시대 미상) 백엔드는 0(= 편중)을 돌려주지만, 잴 것이 없으므로 null(화면에서 '—')로 바꾼다.
+/** @param {{ values: number[], evenness: number } | null | undefined} group */
+export const groupEvenness = (group) =>
+	group && group.values.some((v) => v > 0) ? group.evenness : null;
+
 // 같은 횟수는 같은 순위, 다음 순위는 그만큼 건너뛴다(1, 2, 2, 4). values 는 많은 순이다.
 /** @param {number[]} values */
 export function competitionRanks(values) {
