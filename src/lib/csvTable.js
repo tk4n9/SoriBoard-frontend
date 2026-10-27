@@ -19,3 +19,17 @@ export function toCsvTable(headers, rows) {
 export function downloadCsvTable(filename, headers, rows) {
 	saveCsv(filename, toCsvTable(headers, rows));
 }
+
+// 시계열 여러 계열(다양성 추이 등)을 CSV 의 열로: 기간, 계열마다 한 열. 값은 차트가 그리는 그대로다.
+/**
+ * @param {string[]} labels
+ * @param {string} labelHeader
+ * @param {{ name: string, values: (number | null)[] }[]} series
+ * @returns {{ headers: string[], rows: unknown[][] }}
+ */
+export function seriesCsv(labels, labelHeader, series) {
+	return {
+		headers: [labelHeader, ...series.map((s) => s.name)],
+		rows: labels.map((label, i) => [label, ...series.map((s) => s.values[i])])
+	};
+}

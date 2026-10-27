@@ -19,6 +19,7 @@
 	import { requestGroups, genreDistribution } from '$lib/statCards.js';
 	import { chooseTimelineBucket, timelineBucketName, timelineView } from '$lib/statBucket.js';
 	import { rankTable, shareTable, seriesTable, formatEvenness } from '$lib/statTable.js';
+	import { seriesCsv } from '$lib/csvTable.js';
 	import { barItemIndex, drillTarget, drillParams } from '$lib/statDrill.js';
 	import {
 		CURRENT,
@@ -300,11 +301,17 @@
 			`${bucketLabel} 다양성 추이`,
 			'0=편중 · 1=고름 (가능한 모든 구간을 고르게 틀수록 1)'
 		);
-	// 다양성 추이 CSV 용(시대 다양성 한 계열).
+	// 다양성 추이: 차트의 data(PNG·CSV 저장의 빈 데이터 판단용)와, 두 계열을 모두 싣는 CSV.
 	$: diversityCsvData = diversity && {
 		labels: diversity.timeline.labels,
 		values: diversity.timeline.era_evenness
 	};
+	$: diversityCsv =
+		diversity &&
+		seriesCsv(diversity.timeline.labels, '기간', [
+			{ name: '시대다양성', values: diversity.timeline.era_evenness },
+			{ name: '장르다양성', values: diversity.timeline.genre_evenness }
+		]);
 	// 표로 보기: 다양성 추이는 두 계열을 모두 싣는다(그 밖의 시계열 카드는 data 로 만든다).
 	$: diversityTable =
 		diversity &&
@@ -572,7 +579,7 @@
 				table={diversityTable}
 				loading={loading.diversity}
 				error={errors.diversity}
-				csvHeaders={['기간', '시대다양성']}
+				csv={diversityCsv}
 			/>
 		</div>
 	{/if}

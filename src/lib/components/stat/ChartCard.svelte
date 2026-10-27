@@ -3,11 +3,13 @@
 	import DataTable from './DataTable.svelte';
 	import { seriesTable } from '$lib/statTable.js';
 	import { downloadCsv, downloadDataUrl, todayStamp } from '$lib/csv.js';
+	import { downloadCsvTable } from '$lib/csvTable.js';
 
 	export let title = '';
 	export let option = null; // ECharts option (제목/부제 포함)
 	export let data = null; // { labels, values } — CSV 내보내기용
 	export let csvHeaders = ['항목', '횟수'];
+	export let csv = null; // { headers, rows }: 여러 열 CSV(csvTable.js). 없으면 data 와 csvHeaders 로 만든다.
 	export let loading = false;
 	export let note = ''; // 데이터 경고 등
 	export let noteLink = null; // { href, text }: 경고 뒤에 붙는 링크(예: 작곡가 정리)
@@ -35,7 +37,10 @@
 	}
 
 	function exportCsv() {
-		if (hasData) downloadCsv(`통계_${title}_${todayStamp()}.csv`, data.labels, data.values, csvHeaders);
+		if (!hasData) return;
+		const filename = `통계_${title}_${todayStamp()}.csv`;
+		if (csv) downloadCsvTable(filename, csv.headers, csv.rows);
+		else downloadCsv(filename, data.labels, data.values, csvHeaders);
 	}
 </script>
 
