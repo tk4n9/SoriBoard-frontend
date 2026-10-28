@@ -14,6 +14,11 @@ export const formatCount = (v) => (v == null ? DASH : v.toLocaleString('ko-KR'))
 /** @param {number | null | undefined} v */
 export const formatEvenness = (v) => (v == null ? DASH : v.toFixed(2));
 
+// 비율(시대·장르 도넛과 그 표, 학기 결산)은 소수 한 자리로, 0 도 붙여 쓴다(16.0%).
+export const SHARE_PRECISION = 1;
+/** @param {number} v */
+export const formatShare = (v) => `${v.toFixed(SHARE_PRECISION)}%`;
+
 // 다양성 응답의 summary.era·summary.genre → 그 고른정도. 센 선곡이 없으면(선곡이 없거나 모두
 // 시대 미상) 백엔드는 0(= 편중)을 돌려주지만, 잴 것이 없으므로 null(화면에서 '—')로 바꾼다.
 /** @param {{ values: number[], evenness: number } | null | undefined} group */
@@ -78,7 +83,7 @@ export function rankTable({ labels, values }, nameHeader) {
  * @returns {Table}
  */
 export function shareTable({ labels, values }, nameHeader) {
-	const shares = sharePercents(values);
+	const shares = sharePercents(values, SHARE_PRECISION);
 	return {
 		columns: [
 			{ name: nameHeader },
@@ -86,7 +91,7 @@ export function shareTable({ labels, values }, nameHeader) {
 			{ name: '비율', numeric: true }
 		],
 		rowHeader: 0,
-		rows: labels.map((label, i) => [label, formatCount(values[i]), `${shares[i]}%`])
+		rows: labels.map((label, i) => [label, formatCount(values[i]), formatShare(shares[i])])
 	};
 }
 

@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { timelineOption, diversityLineOption, eraPieOption } from '../../src/lib/chartOptions.js';
+import { shareTable, SHARE_PRECISION } from '../../src/lib/statTable.js';
 
 const labels = ['2025-1학기', '2025-2학기', '2026-1학기', '2026-2학기'];
 const series = [
@@ -49,4 +50,27 @@ test('pie slice labels fit between the subtitle and the legend of a 340px card',
 	assert.ok(cy - reach >= 60, `labels reach up to ${cy - reach}px`);
 	assert.ok(cy + reach <= 320, `labels reach down to ${cy + reach}px`);
 	assert.equal(option.legend.bottom, 0);
+});
+
+test('pie labels and tooltips print the share as the table does (one decimal)', () => {
+	const data = { labels: ['바로크', '고전'], values: [3, 1] };
+	const option = eraPieOption(data, '시대별 분포', '전체 · 총 4곡');
+	const [series] = option.series;
+	// ECharts 가 percentPrecision 자리로 나눈 비율(percent)을 넘긴다.
+	assert.equal(series.percentPrecision, SHARE_PRECISION);
+	const rows = shareTable(data, '시대').rows;
+	assert.equal(series.label.formatter({ name: '바로크', percent: 75 }), `바로크\n${rows[0][2]}`);
+	assert.equal(
+		option.tooltip.formatter({ name: '고전', value: 1, percent: 25 }),
+		`고전: 1곡 (${rows[1][2]})`
+	);
+	assert.equal(series.label.formatter({ name: '고전', percent: 18.8 }), '고전\n18.8%');
+});
+
+test('pie tooltips escape the name, as the string template did', () => {
+	const option = eraPieOption({ labels: ['<b>&'], values: [1] }, '', '');
+	assert.equal(
+		option.tooltip.formatter({ name: '<b>&', value: 1, percent: 100 }),
+		'&#60;b&#62;&#38;: 1곡 (100.0%)'
+	);
 });

@@ -5,6 +5,7 @@ import {
 	sharePercents,
 	rankTable,
 	shareTable,
+	formatShare,
 	seriesTable,
 	formatCount,
 	formatEvenness,
@@ -58,9 +59,20 @@ test('a share table gives the count and the pie percentage', () => {
 	);
 	assert.equal(table.rowHeader, 0);
 	assert.deepEqual(table.rows, [
-		['바로크', '3', '75%'],
-		['미상', '1', '25%']
+		['바로크', '3', '75.0%'],
+		['미상', '1', '25.0%']
 	]);
+});
+
+test('share tables give one fixed decimal, so equal counts read the same', () => {
+	// 이번 학기 장르: two decimals read 39.85% · 30.08% · 30.07%.
+	const table = shareTable({ labels: ['교향곡', '협주곡', '기타'], values: [53, 40, 40] }, '장르');
+	assert.deepEqual(
+		table.rows.map((row) => row[2]),
+		['39.8%', '30.1%', '30.1%']
+	);
+	assert.equal(formatShare(16), '16.0%');
+	assert.equal(formatShare(22.6), '22.6%');
 });
 
 test('a series table has one column per series, each with its own format', () => {

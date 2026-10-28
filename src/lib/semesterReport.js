@@ -1,6 +1,6 @@
 // 학기 결산(/stat/report?semester_id=<id>): 학기 고르기, 지난 학기, 시대·장르 비교 표,
 // 처음 튼 작곡가·곡 표, 링크. 결산은 클럽 전체의 기록이다(지기별 순위는 없다).
-import { formatCount, sharePercents } from './statTable.js';
+import { formatCount, sharePercents, formatShare, SHARE_PRECISION } from './statTable.js';
 
 const ID = /^[1-9]\d*$/;
 
@@ -91,9 +91,6 @@ export function mergeLabels(a, b) {
 	return [...new Set(out)];
 }
 
-/** @param {number} v */
-const formatShare = (v) => `${v.toFixed(1)}%`;
-
 // 비율의 변화(%p, 소수 한 자리). 보이는 두 비율의 차이다.
 /** @param {number} v */
 export function formatChange(v) {
@@ -106,7 +103,7 @@ export function formatChange(v) {
 /** @param {{ labels: string[], values: number[] }} data */
 function shareByLabel({ labels, values }) {
 	if (values.reduce((acc, v) => acc + v, 0) === 0) return null;
-	const shares = sharePercents(values, 1);
+	const shares = sharePercents(values, SHARE_PRECISION);
 	return new Map(labels.map((label, i) => [label, shares[i]]));
 }
 

@@ -6,6 +6,8 @@
 // 모든 색은 Pantone 2026 공식 스와치 값 그대로다(혼합·투명도·파생 색 없음).
 // ECharts 가 기본값으로 칠하는 색(축, 격자, 툴팁, 호버 강조)도 모두 스와치로 지정한다.
 
+import { SHARE_PRECISION, formatShare } from './statTable.js';
+
 const ACCENT = '#DBD2DB'; // Orchid Tint 13-3802 TCX (= --action-bg / --primary-primary-600)
 const TEXT = '#2B2C30'; // Stretch Limo 19-4005 TCX (= --gray-gray-950)
 const SUBTEXT = '#656667'; // Micron 20-0007 TPM (= --gray-gray-600)
@@ -229,6 +231,10 @@ export function diversityLineOption(labels, series, title, subtitle) {
 	};
 }
 
+// 툴팁은 HTML 로 그려지므로 이름을 이스케이프한다(ECharts 의 문자열 템플릿이 하던 일).
+/** @param {string} s */
+const escapeHtml = (s) => String(s).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+
 // 시대 분포 도넛 (eras) — 장르 분포도 같은 형태라 공용으로 쓴다.
 export function eraPieOption({ labels, values }, title, subtitle) {
 	const data = labels.map((name, i) => ({ name, value: values[i] }));
@@ -236,7 +242,11 @@ export function eraPieOption({ labels, values }, title, subtitle) {
 		title: titleBlock(title, subtitle),
 		textStyle: BASE_TEXT_STYLE,
 		color: CATEGORICAL,
-		tooltip: { trigger: 'item', formatter: '{b}: {c}곡 ({d}%)', ...TOOLTIP_BOX },
+		tooltip: {
+			trigger: 'item',
+			formatter: (p) => `${escapeHtml(p.name)}: ${p.value}곡 (${formatShare(p.percent)})`,
+			...TOOLTIP_BOX
+		},
 		legend: {
 			bottom: 0,
 			inactiveColor: GRID,
@@ -252,9 +262,15 @@ export function eraPieOption({ labels, values }, title, subtitle) {
 				radius: ['36%', '58%'],
 				center: ['50%', '56%'],
 				avoidLabelOverlap: true,
+				// 비율은 '표로 보기'·학기 결산과 같이 소수 한 자리(statTable.js).
+				percentPrecision: SHARE_PRECISION,
 				itemStyle: { borderColor: OUTLINE, borderWidth: 1 },
 				emphasis: NO_EMPHASIS,
-				label: { fontFamily: FONT, color: TEXT, formatter: '{b}\n{d}%' },
+				label: {
+					fontFamily: FONT,
+					color: TEXT,
+					formatter: (p) => `${p.name}\n${formatShare(p.percent)}`
+				},
 				labelLine: { lineStyle: { color: SUBTEXT } },
 				data
 			}
