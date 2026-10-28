@@ -22,7 +22,8 @@
 		timelineBucketName,
 		timelineView,
 		readDiversityBucket,
-		writeDiversityBucket
+		writeDiversityBucket,
+		semesterRangeOf
 	} from '$lib/statBucket.js';
 	import {
 		rankTable,
@@ -288,7 +289,8 @@
 
 	// 부제: 현재 범위 + 전체 선곡 수.
 	$: scopeLabel = scope === 'individual' ? '개인' : '전체';
-	// 머리말 기간: 백엔드가 돌려준 범위. 아직 없으면 보낼 범위로 짐작한다.
+	// 머리말 기간: 백엔드가 돌려준 범위. 아직 없으면 보낼 범위로 짐작한다(학기는 학기 목록의 연도·학기로).
+	$: semesterRange = semesterRangeOf(period, semesters);
 	$: periodText = appliedFilters
 		? periodRangeText(appliedFilters)
 		: period === CURRENT
@@ -297,12 +299,12 @@
 				? '전체 기간'
 				: period === CUSTOM
 					? periodRangeText({ start: customStart, end: customEnd })
-					: '';
+					: periodRangeText(semesterRange);
 	// 직접 지정을 고르면 입력란에 지금 보이는 기간을 채운다(전체 기간이면 이번 학기).
 	$: shownRange =
 		appliedFilters && (appliedFilters.start || appliedFilters.end)
 			? { start: appliedFilters.start ?? '', end: appliedFilters.end ?? '' }
-			: { start: startDate, end: endDate };
+			: semesterRange ?? { start: startDate, end: endDate };
 	// 내려받는 파일 이름에 넣을 보기: 머리말의 기간과, 개인이면 지기(statFileName.js).
 	let userName = '';
 	$: fileTag = [

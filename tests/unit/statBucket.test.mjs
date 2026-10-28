@@ -10,7 +10,8 @@ import {
 	writeDiversityBucket,
 	bucketRange,
 	clipRange,
-	semesterIdOf
+	semesterIdOf,
+	semesterRangeOf
 } from '../../src/lib/statBucket.js';
 
 const TODAY = '2026-10-26';
@@ -179,4 +180,31 @@ test('semesterIdOf finds a 학기 bucket in the 학기 list by year and number',
 	assert.equal(semesterIdOf('2025-1학기', semesters), null);
 	assert.equal(semesterIdOf('2025-1', []), null);
 	assert.equal(semesterIdOf('2025-1', null), null);
+});
+
+test('semesterRangeOf gives the dates of a 학기 in the list, by id', () => {
+	const semesters = [
+		{ id: 1, year: 2025, semester_num: 2 },
+		{ id: 3, year: 2025, semester_num: 1 },
+		{ id: 6, year: 2027, semester_num: 2 }
+	];
+	assert.deepEqual(semesterRangeOf('3', semesters), { start: '2025-03-01', end: '2025-08-31' });
+	assert.deepEqual(semesterRangeOf('1', semesters), { start: '2025-09-01', end: '2026-02-28' });
+	// 2학기는 다음 해 2월 말일까지(윤년이면 29일).
+	assert.deepEqual(semesterRangeOf('6', semesters), { start: '2027-09-01', end: '2028-02-29' });
+});
+
+test('semesterRangeOf answers null without the 학기 or for a period that is not one', () => {
+	const semesters = [
+		{ id: 1, year: 2025, semester_num: 2 },
+		{ id: 7, year: 2025, semester_num: 3 }
+	];
+	assert.equal(semesterRangeOf('2', semesters), null);
+	assert.equal(semesterRangeOf('1', []), null);
+	assert.equal(semesterRangeOf('1', null), null);
+	for (const period of ['current', 'all', 'custom']) {
+		assert.equal(semesterRangeOf(period, semesters), null);
+	}
+	// 1·2학기가 아니면 짐작하지 않는다.
+	assert.equal(semesterRangeOf('7', semesters), null);
 });

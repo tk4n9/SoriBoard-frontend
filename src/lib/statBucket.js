@@ -117,6 +117,18 @@ export function semesterIdOf(label, semesters) {
 	return found ? String(found.id) : null;
 }
 
+// 학기 id(기간 값) → 학기 목록에서 찾은 그 학기의 날짜 범위(백엔드의 semester_id 와 같은 규칙).
+// 목록에 없거나(목록을 못 받았으면) 학기가 아닌 기간이면 null.
+/**
+ * @param {string} id
+ * @param {{ id: number, year: number, semester_num: number }[] | null | undefined} semesters
+ */
+export function semesterRangeOf(id, semesters) {
+	if (!Array.isArray(semesters)) return null;
+	const found = semesters.find((s) => String(s.id) === id);
+	return found ? bucketRange('semester', `${found.year}-${found.semester_num}`) : null;
+}
+
 // 범위를 응답이 적용한 기간(filters.start·end, 없으면 그쪽이 열림) 안으로 줄인다.
 // 예: 이번 학기가 9/1 부터면 주 '2026-08-31' 은 9/1~9/6. 겹치지 않으면 null.
 /**
