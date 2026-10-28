@@ -240,10 +240,13 @@
 	}
 
 	// 머리말의 기간과, 직접 지정을 고르면 입력란에 채울 범위(지금 보이는 기간, 전체 기간이면 이번 학기).
+	// 학기의 범위를 받기 전에는 학기 목록(PeriodSelect)으로 짐작한다.
+	let semesters = [];
 	$: ({ text: periodText, shown: shownRange } = historyPeriod(
 		{ period, start: customStart, end: customEnd },
 		current,
-		semesterFilters
+		semesterFilters,
+		semesters
 	));
 	$: statLink = statHref({
 		period,
@@ -298,6 +301,7 @@
 				bind:period
 				bind:start={customStart}
 				bind:end={customEnd}
+				bind:semesters
 				{shownRange}
 				on:change={onPeriodChange}
 			/>

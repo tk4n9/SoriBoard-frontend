@@ -536,6 +536,44 @@ test('historyPeriod: header text and the range 직접 지정 starts from', () =>
 	});
 });
 
+test('historyPeriod guesses a 학기’s dates from the 학기 list until its range arrives', () => {
+	const current = { start: '2026-09-01', end: '2026-10-27' };
+	const at = (period, start = '', end = '') => ({ period, start, end });
+	const semesters = [
+		{ id: 1, year: 2025, semester_num: 2 },
+		{ id: 3, year: 2025, semester_num: 1 }
+	];
+	const guess = { start: '2025-09-01', end: '2026-02-28' };
+	const guessed = { text: '2025-09-01 ~ 2026-02-28', shown: guess };
+	// 범위를 받기 전, 다른 학기의 범위를 받았을 때, 백엔드가 그 학기를 모를 때는 목록으로 짐작한다.
+	assert.deepEqual(historyPeriod(at('1'), current, null, semesters), guessed);
+	assert.deepEqual(
+		historyPeriod(at('1'), current, { semester_id: '3', start: '2025-03-01' }, semesters),
+		guessed
+	);
+	assert.deepEqual(historyPeriod(at('1'), current, { scope: 'all' }, semesters), guessed);
+	// 받은 범위가 그 학기의 것이면 그것을 쓴다.
+	const echoed = { semester_id: '1', start: '2025-09-02', end: '2026-02-27' };
+	assert.deepEqual(historyPeriod(at('1'), current, echoed, semesters), {
+		text: '2025-09-02 ~ 2026-02-27',
+		shown: { start: '2025-09-02', end: '2026-02-27' }
+	});
+	// 목록에 없는 학기나 목록이 없으면 전처럼 비어 있다.
+	const blank = { text: '', shown: current };
+	assert.deepEqual(historyPeriod(at('99'), current, null, semesters), blank);
+	assert.deepEqual(historyPeriod(at('1'), current, null, []), blank);
+	assert.deepEqual(historyPeriod(at('1'), current, null), blank);
+	// 다른 기간에서는 학기 목록을 쓰지 않는다.
+	assert.deepEqual(historyPeriod(at('all'), current, null, semesters), {
+		text: '전체 기간',
+		shown: current
+	});
+	assert.deepEqual(historyPeriod(at('custom', '2025-01-01', ''), current, null, semesters), {
+		text: '2025-01-01 ~',
+		shown: { start: '2025-01-01', end: '' }
+	});
+});
+
 test('workHistoryHref opens the plays of one work, all time or in one 학기', () => {
 	assert.equal(workHistoryHref(20), '/stat/history?period=all&music_id=20');
 	assert.equal(workHistoryHref('20', '3'), '/stat/history?semester_id=3&music_id=20');

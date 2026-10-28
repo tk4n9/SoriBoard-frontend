@@ -13,7 +13,7 @@ import {
 	periodRangeText
 } from './statPeriod.js';
 import { DRILL_CARDS } from './statDrill.js';
-import { bucketRange, clipRange, semesterIdOf } from './statBucket.js';
+import { bucketRange, clipRange, semesterIdOf, semesterRangeOf } from './statBucket.js';
 
 // 한 번에 불러오는 선곡 수(plays/ 의 기본값).
 export const PAGE_SIZE = 50;
@@ -274,13 +274,15 @@ export function semesterRangeParams(period) {
 }
 
 // 머리말의 기간 문구(text)와 직접 지정을 고를 때 입력란에 채울 범위(shown). 학기는 받은
-// filters 가 그 학기의 것일 때만 날짜를 보이고, 그 전에는 문구가 비고 범위는 이번 학기다.
+// filters 가 그 학기의 것이면 그 날짜를, 그 전(또는 받지 못하면)에는 학기 목록의 연도·학기로
+// 짐작한 날짜를 보인다. 둘 다 없으면 문구가 비고 범위는 이번 학기다.
 /**
  * @param {Pick<HistoryFilter, 'period' | 'start' | 'end'>} filter
  * @param {{ start: string, end: string }} current
  * @param {{ semester_id?: string, start?: string, end?: string } | null | undefined} semesterFilters
+ * @param {{ id: number, year: number, semester_num: number }[] | null} [semesters]
  */
-export function historyPeriod(filter, current, semesterFilters) {
+export function historyPeriod(filter, current, semesterFilters, semesters = null) {
 	const { period } = filter;
 	if (period === CURRENT) return { text: periodRangeText(current), shown: current };
 	if (period === ALL) return { text: '전체 기간', shown: current };
@@ -289,7 +291,10 @@ export function historyPeriod(filter, current, semesterFilters) {
 		return { text: periodRangeText(custom), shown: custom };
 	}
 	const f = semesterFilters;
-	if (!f || f.semester_id !== period || !(f.start || f.end)) return { text: '', shown: current };
+	if (!f || f.semester_id !== period || !(f.start || f.end)) {
+		const guess = semesterRangeOf(period, semesters);
+		return guess ? { text: periodRangeText(guess), shown: guess } : { text: '', shown: current };
+	}
 	return { text: periodRangeText(f), shown: { start: f.start ?? '', end: f.end ?? '' } };
 }
 
