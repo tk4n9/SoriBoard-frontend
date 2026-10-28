@@ -7,6 +7,8 @@ import {
 	mergeLabels,
 	formatChange,
 	mixTable,
+	mixSubtitle,
+	loadWithPrevious,
 	firstsTable
 } from '../../src/lib/semesterReport.js';
 
@@ -132,4 +134,81 @@ test('firstsTable lists name, first play and count in backend order', () => {
 		['H - 협주곡', '2026-09-07', '3'],
 		['A - 모음곡', '2026-09-14', '1,200']
 	]);
+});
+
+test('loadWithPrevious keeps this 학기 when only the previous one fails', async () => {
+	const now = { total_plays: 551 };
+	const before = { total_plays: 610 };
+	const boom = new Error('eras 500');
+	assert.deepEqual(
+		await loadWithPrevious(
+			async () => now,
+			async () => before
+		),
+		{ current: now, previous: before, previousError: null }
+	);
+	assert.deepEqual(await loadWithPrevious(async () => now, null), {
+		current: now,
+		previous: null,
+		previousError: null
+	});
+	assert.deepEqual(
+		await loadWithPrevious(
+			async () => now,
+			async () => {
+				throw boom;
+			}
+		),
+		{ current: now, previous: null, previousError: boom }
+	);
+	await assert.rejects(
+		loadWithPrevious(
+			async () => {
+				throw boom;
+			},
+			async () => before
+		),
+		boom
+	);
+});
+
+test('loadWithPrevious sends both requests at once', async () => {
+	const started = [];
+	let release;
+	const gate = new Promise((resolve) => (release = resolve));
+	const pending = loadWithPrevious(
+		async () => {
+			started.push('now');
+			await gate;
+			return 1;
+		},
+		async () => {
+			started.push('before');
+			return 2;
+		}
+	);
+	assert.deepEqual(started, ['now', 'before']);
+	release();
+	assert.deepEqual(await pending, { current: 1, previous: 2, previousError: null });
+});
+
+test('mixSubtitle names both 학기, a missing one, or a failed one', () => {
+	const current = { total_plays: 1903 };
+	assert.equal(mixSubtitle(null, '2025-2학기', '2025-1학기'), '');
+	assert.equal(
+		mixSubtitle({ current, previous: { total_plays: 610 } }, '2025-2학기', '2025-1학기'),
+		'2025-2학기 총 1,903곡 · 지난 학기(2025-1학기) 총 610곡'
+	);
+	assert.equal(
+		mixSubtitle({ current, previous: null, previousError: null }, '2024-1학기', ''),
+		'2024-1학기 총 1,903곡 · 지난 학기 없음'
+	);
+	assert.equal(
+		mixSubtitle(
+			{ current, previous: null, previousError: new Error('x') },
+			'2025-2학기',
+			'2025-1학기'
+		),
+		'2025-2학기 총 1,903곡 · 지난 학기(2025-1학기)를 불러오지 못했습니다'
+	);
 });

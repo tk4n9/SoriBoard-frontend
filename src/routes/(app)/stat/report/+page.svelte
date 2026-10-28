@@ -16,6 +16,8 @@
 		pickSemester,
 		previousSemester,
 		mixTable,
+		mixSubtitle,
+		loadWithPrevious,
 		firstsTable
 	} from '$lib/semesterReport.js';
 
@@ -39,12 +41,17 @@
 		return res.json();
 	};
 	// 시대·장르는 지난 학기와 견준다(지난 학기가 없으면 previous 는 null).
+	// 지난 학기만 실패하면 이 학기만으로 그린다(semesterReport.js).
 	const withPrevious = async (endpoint) => {
-		const [now, before] = await Promise.all([
-			getJson(endpoint, semester.id),
-			previous ? getJson(endpoint, previous.id) : null
-		]);
-		return { current: now, previous: before };
+		const before = previous;
+		const pair = await loadWithPrevious(
+			() => getJson(endpoint, semester.id),
+			before && (() => getJson(endpoint, before.id))
+		);
+		if (pair.previousError) {
+			console.error(`학기 결산 지난 학기 로딩 실패 (${endpoint})`, pair.previousError);
+		}
+		return pair;
 	};
 	const cardRequests = {
 		summary: () => getJson('summary', semester.id),
@@ -217,10 +224,7 @@
 		title,
 		pair,
 		table: pair?.current.labels.length ? mixTable(pair.current, pair.previous, nameHeader) : null,
-		subtitle: pair
-			? `${now} ${total(pair.current)}` +
-				(pair.previous ? ` · 지난 학기(${before}) ${total(pair.previous)}` : ' · 지난 학기 없음')
-			: ''
+		subtitle: mixSubtitle(pair, now, before)
 	});
 	$: mixCards = [
 		mixCard('eras', '시대별 분포', eras, '시대', label, previousLabel),

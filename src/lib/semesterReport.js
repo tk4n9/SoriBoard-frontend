@@ -33,6 +33,43 @@ export function previousSemester(semester, sorted) {
 	return i >= 0 ? sorted[i + 1] ?? null : null;
 }
 
+// 시대·장르처럼 지난 학기와 견주는 카드의 응답 한 쌍. 두 요청은 함께 보낸다.
+// 이 학기가 실패하면 카드가 실패하고, 지난 학기만 실패하면 이 학기만으로 그린다(previousError).
+// loadBefore 가 없으면(지난 학기 없음) previous 는 null 이다.
+/**
+ * @template T
+ * @param {() => Promise<T>} loadNow
+ * @param {(() => Promise<T>) | null} loadBefore
+ * @returns {Promise<{ current: T, previous: T | null, previousError: unknown }>}
+ */
+export async function loadWithPrevious(loadNow, loadBefore) {
+	const [now, before] = await Promise.allSettled([
+		loadNow(),
+		loadBefore ? loadBefore() : Promise.resolve(null)
+	]);
+	if (now.status === 'rejected') throw now.reason;
+	return before.status === 'fulfilled'
+		? { current: now.value, previous: before.value, previousError: null }
+		: { current: now.value, previous: null, previousError: before.reason ?? 'failed' };
+}
+
+/** @param {{ total_plays: number } | null | undefined} envelope */
+const totalText = (envelope) => (envelope ? `총 ${envelope.total_plays.toLocaleString()}곡` : '');
+
+// 시대·장르 카드의 부제: 이 학기와 지난 학기의 선곡 수. 지난 학기를 못 받았으면 그렇다고 쓴다.
+/**
+ * @param {{ current: { total_plays: number }, previous: { total_plays: number } | null, previousError?: unknown } | null | undefined} pair
+ * @param {string} now 이 학기 이름
+ * @param {string} before 지난 학기 이름(없으면 '')
+ */
+export function mixSubtitle(pair, now, before) {
+	if (!pair) return '';
+	const head = `${now} ${totalText(pair.current)}`;
+	if (pair.previous) return `${head} · 지난 학기(${before}) ${totalText(pair.previous)}`;
+	if (pair.previousError) return `${head} · 지난 학기(${before})를 불러오지 못했습니다`;
+	return `${head} · 지난 학기 없음`;
+}
+
 // 두 분포의 이름을 합친다. 둘 다 백엔드의 같은 순서(시대·장르 순)를 따르고 0인 칸만 빠지므로,
 // 그 순서를 지키며 섞는다.
 /**
