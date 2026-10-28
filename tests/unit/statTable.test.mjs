@@ -9,7 +9,8 @@ import {
 	formatCount,
 	formatEvenness,
 	groupEvenness,
-	chartLabel
+	chartLabel,
+	placeholderText
 } from '../../src/lib/statTable.js';
 
 test('equal counts share a rank and the next rank skips', () => {
@@ -113,4 +114,22 @@ test('a chart is named by its title and subtitle and points to the table', () =>
 		"월별 선곡 수 차트. 수치는 '표로 보기'에서 볼 수 있습니다."
 	);
 	assert.equal(chartLabel('', ''), "차트. 수치는 '표로 보기'에서 볼 수 있습니다.");
+});
+
+test('a card without a chart names itself, except while it loads', () => {
+	assert.equal(placeholderText('많이 튼 지휘자', { loading: true }), '불러오는 중...');
+	assert.equal(
+		placeholderText('많이 튼 지휘자', { loading: true, error: '불러오지 못했습니다' }),
+		'불러오는 중...'
+	);
+	assert.equal(
+		placeholderText('많이 튼 지휘자', { error: '불러오지 못했습니다' }),
+		'많이 튼 지휘자 — 불러오지 못했습니다'
+	);
+	assert.equal(placeholderText('많이 튼 지휘자'), '많이 튼 지휘자 — 데이터가 없습니다');
+	assert.equal(
+		placeholderText(' 월별 선곡 수 ', { error: '' }),
+		'월별 선곡 수 — 데이터가 없습니다'
+	);
+	assert.equal(placeholderText(''), '데이터가 없습니다');
 });

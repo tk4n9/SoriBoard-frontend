@@ -119,3 +119,16 @@ export function chartLabel(title, subtitle = '') {
 	const sub = subtitle.trim();
 	return `${sub ? `${name} — ${sub}` : name}. 수치는 '표로 보기'에서 볼 수 있습니다.`;
 }
+
+// 차트를 그리지 못할 때 카드에 보일 문구. 차트 제목은 캔버스에만 그려지므로, 남아 있는 문구(실패,
+// 빈 데이터)에는 어느 카드인지 제목을 붙인다. 불러오는 중은 잠깐이라 그대로 둔다.
+/**
+ * @param {string} title
+ * @param {{ loading?: boolean, error?: string }} [state]
+ */
+export function placeholderText(title, { loading = false, error = '' } = {}) {
+	if (loading) return '불러오는 중...';
+	const message = error || '데이터가 없습니다';
+	const name = title.trim();
+	return name ? `${name} — ${message}` : message;
+}

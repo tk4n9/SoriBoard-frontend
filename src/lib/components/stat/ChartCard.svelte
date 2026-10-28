@@ -1,7 +1,7 @@
 <script>
 	import EChart from './EChart.svelte';
 	import DataTable from './DataTable.svelte';
-	import { seriesTable, chartLabel } from '$lib/statTable.js';
+	import { seriesTable, chartLabel, placeholderText } from '$lib/statTable.js';
 	import { downloadCsv, downloadDataUrl, todayStamp } from '$lib/csv.js';
 	import { downloadCsvTable } from '$lib/csvTable.js';
 	import { downloadName } from '$lib/statFileName.js';
@@ -82,13 +82,11 @@
 	</div>
 
 	<div class="chart-area">
-		{#if loading}
-			<div class="placeholder">불러오는 중...</div>
-		{:else if error}
-			<!-- 제목은 차트가 그리므로, 실패하면 어느 카드인지 여기서 밝힌다. -->
-			<div class="placeholder error">{title} — {error}</div>
-		{:else if !hasData}
-			<div class="placeholder">데이터가 없습니다</div>
+		{#if loading || error || !hasData}
+			<!-- 제목은 차트가 그리므로, 실패하거나 비었으면 어느 카드인지 여기서 밝힌다. -->
+			<div class="placeholder" class:error={!loading && error}>
+				{placeholderText(title, { loading, error })}
+			</div>
 		{:else}
 			<div class="chart-view" class:hidden={showTable && shownTable}>
 				<EChart
