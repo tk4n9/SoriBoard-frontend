@@ -182,9 +182,12 @@
 	let exportTotal = 0;
 	let exportError = '';
 	let userName = ''; // 고른 지기의 이름(MemberSelect)
+	let exportButton;
 
 	async function exportCsv() {
 		const wanted = filter();
+		// 저장하는 동안 단추가 비활성이 되어 포커스를 잃으므로, 단추에 있었으면 끝난 뒤 돌려준다.
+		const hadFocus = document.activeElement === exportButton;
 		// 파일 이름에 누른 때의 기간·지기와 그 밖의 조건(id 필터, 신청곡, 검색어)을 넣는다(statFileName.js).
 		const filename = downloadName(
 			[
@@ -221,6 +224,10 @@
 		} finally {
 			exporting = false;
 		}
+		// 그 사이 다른 곳을 골랐으면 그대로 둔다.
+		await tick();
+		const active = document.activeElement;
+		if (hadFocus && (!active || active === document.body)) exportButton?.focus();
 	}
 
 	// 해제하면 단추가 사라지므로 포커스를 검색란으로 옮긴다.
@@ -319,6 +326,7 @@
 			<span class="more-error" aria-live="polite">{exportError}</span>
 			<button
 				class="tool-btn"
+				bind:this={exportButton}
 				on:click={exportCsv}
 				disabled={!count || exporting}
 				title="조건에 맞는 선곡을 모두 CSV로 저장"
