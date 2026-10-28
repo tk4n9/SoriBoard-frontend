@@ -1,6 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { requestGroups, genreDistribution, DERIVED_CARDS } from '../../src/lib/statCards.js';
+import {
+	requestGroups,
+	genreDistribution,
+	diversityTiles,
+	DERIVED_CARDS
+} from '../../src/lib/statCards.js';
 
 test('the genre card is drawn from the diversity answer', () => {
 	assert.equal(DERIVED_CARDS.genres, 'diversity');
@@ -63,4 +68,38 @@ test('genreDistribution of an empty answer has no labels', () => {
 	});
 	assert.deepEqual(empty.labels, []);
 	assert.equal(empty.total_plays, 0);
+});
+
+test('the 선곡 다양성 tiles are drawn from the diversity answer', () => {
+	assert.equal(DERIVED_CARDS.diversityTiles, 'diversity');
+});
+
+test('a full load asks for diversity once, for the tiles too', () => {
+	assert.deepEqual(requestGroups(['summary', 'diversity', 'genres', 'diversityTiles']), [
+		['summary', ['summary']],
+		['diversity', ['diversity', 'genres', 'diversityTiles']]
+	]);
+});
+
+test('a 주별/월별 reload covers neither the genre card nor the tiles', () => {
+	assert.deepEqual(requestGroups(['diversity', 'timeline']), [
+		['diversity', ['diversity']],
+		['timeline', ['timeline']]
+	]);
+});
+
+test('diversityTiles takes the summary, which does not depend on the bucket', () => {
+	const summary = {
+		distinct_works: 18,
+		era: { labels: ['바로크'], values: [134], unknown_share: 0, entropy: 0, evenness: 0 },
+		genre: { labels: ['교향곡', '기타'], values: [100, 34], entropy: 0.56, evenness: 0.31 }
+	};
+	const answer = (bucket) => ({
+		filters: { bucket },
+		total_plays: 134,
+		summary,
+		timeline: { bucket, labels: [], plays: [] }
+	});
+	assert.equal(diversityTiles(answer('week')), summary);
+	assert.deepEqual(diversityTiles(answer('week')), diversityTiles(answer('month')));
 });

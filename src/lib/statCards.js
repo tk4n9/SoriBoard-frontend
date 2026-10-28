@@ -3,7 +3,8 @@
 
 // 카드 → 그 카드를 그리는 응답을 주는 요청.
 // 장르별 분포는 다양성 응답의 summary.genre 로 그린다(stats/genres 와 같은 분류).
-export const DERIVED_CARDS = { genres: 'diversity' };
+// 선곡 다양성의 칸(시대·장르 다양성, 고유 곡 수)도 다양성 응답의 summary 로 그린다.
+export const DERIVED_CARDS = { genres: 'diversity', diversityTiles: 'diversity' };
 
 // 한 번의 로드가 덮는 카드들을 요청별로 묶는다: [[요청, [카드…]], …] (처음 나온 순서).
 /**
@@ -30,3 +31,8 @@ export function genreDistribution(diversity) {
 	const { labels, values } = diversity.summary.genre;
 	return { filters: diversity.filters, total_plays: diversity.total_plays, labels, values };
 }
+
+// 다양성 응답 → 선곡 다양성의 칸(시대·장르 다양성, 고유 곡 수)이 읽는 summary.
+// summary 는 버킷과 무관하므로 주별/월별만 바꾸면 칸은 그대로 둔다(다시 부르는 카드가 아니다).
+/** @param {any} diversity */
+export const diversityTiles = (diversity) => diversity.summary;

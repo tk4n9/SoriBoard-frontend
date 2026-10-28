@@ -16,7 +16,7 @@
 	} from '$lib/chartOptions.js';
 	import { readStatQuery, statQueryHref } from '$lib/statQuery.js';
 	import { createLatestRequests } from '$lib/latestRequest.js';
-	import { requestGroups, genreDistribution } from '$lib/statCards.js';
+	import { requestGroups, genreDistribution, diversityTiles } from '$lib/statCards.js';
 	import {
 		chooseTimelineBucket,
 		timelineBucketName,
@@ -125,7 +125,7 @@
 	}
 
 	// 카드는 따로 불러오고, 실패하면 그 카드에만 오류를 띄운다. 요청 하나가 여러 카드를 그릴 수 있다:
-	// 장르별 분포는 따로 부르지 않고 다양성 응답으로 그린다(statCards.js).
+	// 장르별 분포와 선곡 다양성의 칸은 따로 부르지 않고 다양성 응답으로 그린다(statCards.js).
 	const cardRequests = {
 		summary: () => getJson('summary'),
 		composers: () => getJson('composers', { limit: 12 }),
@@ -137,7 +137,7 @@
 		diversity: () => getJson('diversity', { bucket: diversityBucket })
 	};
 	// 다른 카드의 응답에서 꺼내 그리는 카드.
-	const pickCard = { genres: genreDistribution };
+	const pickCard = { genres: genreDistribution, diversityTiles };
 	const CARD_KEYS = [...Object.keys(cardRequests), ...Object.keys(pickCard)];
 
 	/** @type {Record<string, any>} */
@@ -148,6 +148,8 @@
 	let errors = {};
 	$: ({ summary, composers, soloists, conductors, orchestras, timeline, eras, genres, diversity } =
 		data);
+	// 선곡 다양성의 칸: 다양성 응답의 summary. 주별/월별만 바꾸면 다시 부르지 않고 그대로 둔다.
+	$: tiles = data.diversityTiles;
 
 	// 카드마다 자기를 덮는 가장 최근 요청의 응답만 반영한다. 늦게 도착한 이전 요청의 응답은 버린다.
 	const requests = createLatestRequests();
@@ -613,16 +615,16 @@
 
 		<div class="kpi-row diversity-kpi">
 			<div class="kpi">
-				<div class="kpi-value">{diversity ? pct(groupEvenness(diversity.summary.era)) : '—'}</div>
+				<div class="kpi-value">{tiles ? pct(groupEvenness(tiles.era)) : '—'}</div>
 				<div class="kpi-label">시대 다양성</div>
 			</div>
 			<div class="kpi">
-				<div class="kpi-value">{diversity ? pct(groupEvenness(diversity.summary.genre)) : '—'}</div>
+				<div class="kpi-value">{tiles ? pct(groupEvenness(tiles.genre)) : '—'}</div>
 				<div class="kpi-label">장르 다양성</div>
 			</div>
 			<div class="kpi">
 				<div class="kpi-value">
-					{diversity ? diversity.summary.distinct_works.toLocaleString() : '—'}
+					{tiles ? tiles.distinct_works.toLocaleString() : '—'}
 				</div>
 				<div class="kpi-label">고유 곡 수</div>
 			</div>
