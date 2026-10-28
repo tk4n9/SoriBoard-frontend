@@ -672,3 +672,54 @@ test('bucketHistoryLinks keeps the id filters and reads 학기 and month buckets
 	// bucket 이 없으면 라벨을 날짜로 읽을 수 없으므로 링크도 없다.
 	assert.deepEqual(bucketHistoryLinks(filter, { labels: ['2026-03'] }), [null]);
 });
+
+test('bucketHistoryLinks opens a whole 학기 in the 학기 list by semester_id, and a cut one by dates', () => {
+	const semesters = [
+		{ id: 1, year: 2025, semester_num: 2 },
+		{ id: 3, year: 2025, semester_num: 1 },
+		{ id: 2, year: 2026, semester_num: 2 }
+	];
+	const filter = {
+		period: 'custom',
+		start: '2025-05-01',
+		end: '2026-10-01',
+		q: '',
+		userId: '12',
+		includeMentees: false,
+		requested: ''
+	};
+	const timeline = {
+		filters: { start: '2025-05-01', end: '2026-10-01', bucket: 'semester', user_id: 12 },
+		labels: ['2025-1', '2025-2', '2026-1', '2026-2']
+	};
+	const links = bucketHistoryLinks(filter, timeline, semesters);
+	assert.deepEqual(links, [
+		// 앞뒤 학기는 기간에 잘려 날짜로 연다.
+		'/stat/history?start=2025-05-01&end=2025-08-31&user_id=12',
+		'/stat/history?semester_id=1&user_id=12',
+		// 학기 목록에 없는 학기는 날짜로 연다.
+		'/stat/history?start=2026-03-01&end=2026-08-31&user_id=12',
+		'/stat/history?start=2026-09-01&end=2026-10-01&user_id=12'
+	]);
+	const read = readHistoryQuery(new URL(links[1], 'http://x').searchParams);
+	assert.equal(read.period, '1');
+	assert.equal(read.userId, '12');
+	// 전체 기간(filters 에 날짜가 없음)이면 목록에 있는 학기는 모두 semester_id 다.
+	assert.deepEqual(
+		bucketHistoryLinks(
+			{ ...filter, period: 'all', start: '', end: '', userId: null },
+			{ filters: { bucket: 'semester' }, labels: ['2025-1', '2026-2'] },
+			semesters
+		),
+		['/stat/history?semester_id=3', '/stat/history?semester_id=2']
+	);
+	// 주·월 버킷은 학기 목록과 상관없이 날짜로 연다.
+	assert.deepEqual(
+		bucketHistoryLinks(
+			filter,
+			{ filters: { bucket: 'month', start: '2025-09-01', end: '2026-02-28' }, labels: ['2025-09'] },
+			semesters
+		),
+		['/stat/history?start=2025-09-01&end=2025-09-30&user_id=12']
+	);
+});

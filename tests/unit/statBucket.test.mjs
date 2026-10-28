@@ -9,7 +9,8 @@ import {
 	readDiversityBucket,
 	writeDiversityBucket,
 	bucketRange,
-	clipRange
+	clipRange,
+	semesterIdOf
 } from '../../src/lib/statBucket.js';
 
 const TODAY = '2026-10-26';
@@ -162,4 +163,20 @@ test('clipRange keeps a bucket inside the period the answer applied', () => {
 	assert.deepEqual(clipRange(week, null), week);
 	assert.equal(clipRange(week, { start: '2026-09-07' }), null);
 	assert.equal(clipRange(null, { start: '2026-09-01' }), null);
+});
+
+test('semesterIdOf finds a 학기 bucket in the 학기 list by year and number', () => {
+	const semesters = [
+		{ id: 1, year: 2025, semester_num: 2 },
+		{ id: 3, year: 2025, semester_num: 1 },
+		{ id: 2, year: 2026, semester_num: 2 }
+	];
+	assert.equal(semesterIdOf('2025-1', semesters), '3');
+	assert.equal(semesterIdOf('2025-2', semesters), '1');
+	assert.equal(semesterIdOf('2024-1', semesters), null);
+	// 학기 라벨이 아니면(주·월) 찾지 않는다.
+	assert.equal(semesterIdOf('2025-09', semesters), null);
+	assert.equal(semesterIdOf('2025-1학기', semesters), null);
+	assert.equal(semesterIdOf('2025-1', []), null);
+	assert.equal(semesterIdOf('2025-1', null), null);
 });

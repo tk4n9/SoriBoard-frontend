@@ -45,12 +45,14 @@ function composerHistoryFilter(id, extra = []) {
 }
 
 // 학기별 선곡의 학기마다 → 그 학기에 이 작곡가의 곡을 튼 선곡 기록(stats/timeline 의 학기 버킷).
+// 학기 목록에 있는 학기는 semester_id 로, 없으면 그 날짜로 연다.
 /**
  * @param {number | string | null} id
  * @param {{ filters?: { bucket?: string }, labels: string[] } | null | undefined} timeline
+ * @param {{ id: number, year: number, semester_num: number }[] | null} [semesters] /api/semester
  */
-export function composerSemesterLinks(id, timeline) {
-	return id ? bucketHistoryLinks(composerHistoryFilter(id), timeline) : [];
+export function composerSemesterLinks(id, timeline, semesters = []) {
+	return id ? bucketHistoryLinks(composerHistoryFilter(id), timeline, semesters) : [];
 }
 
 // 순위 카드(독주자·지휘자)의 항목마다 → 이 작곡가의 곡을 그 대상과 튼 선곡 기록. 이름이 아니라

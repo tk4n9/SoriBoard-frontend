@@ -20,7 +20,8 @@
 	const dispatch = createEventDispatcher();
 	const errorId = 'period-range-error';
 	const listErrorId = 'period-list-error';
-	let semesters = [];
+	// 불러온 학기 목록(최신순). 페이지가 bind 해 시계열 카드의 학기 링크에 쓴다.
+	export let semesters = [];
 	let listError = '';
 	// 입력란의 값. '적용'을 누르고 범위가 맞을 때만 start·end 로 옮긴다.
 	let draftStart = start;

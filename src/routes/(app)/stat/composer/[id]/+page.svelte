@@ -1,4 +1,5 @@
 <script>
+	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
 	import { afterNavigate, goto } from '$app/navigation';
 	import ChartCard from '$lib/components/stat/ChartCard.svelte';
@@ -97,6 +98,18 @@
 	// 처음 열 때와, 같은 페이지에서 다른 작곡가로 옮겨 갈 때.
 	afterNavigate(loadAll);
 
+	// 학기별 선곡의 학기를 그 학기(semester_id)로 열기 위한 학기 목록. 못 받으면 날짜로 연다.
+	let semesters = [];
+	onMount(async () => {
+		try {
+			const res = await fetch('/api/semester');
+			if (!res.ok) throw new Error(`semester ${res.status}`);
+			semesters = await res.json();
+		} catch (e) {
+			console.error('학기 목록 로딩 실패', e);
+		}
+	});
+
 	$: title = composer ? composer.name : composerError ? `작곡가 #${composerId}` : '작곡가';
 	// 내려받는 파일 이름에 작곡가를 넣는다(이름을 못 받았으면 '작곡가 #id').
 	$: fileTag = composer ? composer.name : `작곡가 #${composerId}`;
@@ -116,7 +129,7 @@
 	$: soloistLinks = composerRankLinks(composerId, 'soloists', soloists);
 	$: conductorLinks = composerRankLinks(composerId, 'conductors', conductors);
 	// 학기는 그 학기에 이 작곡가의 곡을 튼 선곡 기록으로 간다.
-	$: semesterLinks = composerSemesterLinks(composerId, timeline);
+	$: semesterLinks = composerSemesterLinks(composerId, timeline, semesters);
 	// 막대의 dataIndex 는 뒤집힌 순서다(horizontalBarOption). 학기별 선곡은 뒤집지 않는다.
 	function openBar(links, e, reversed = true) {
 		const i = e.detail.dataIndex;

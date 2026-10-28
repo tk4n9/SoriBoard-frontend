@@ -13,7 +13,7 @@ import {
 	periodRangeText
 } from './statPeriod.js';
 import { DRILL_CARDS } from './statDrill.js';
-import { bucketRange, clipRange } from './statBucket.js';
+import { bucketRange, clipRange, semesterIdOf } from './statBucket.js';
 
 // 한 번에 불러오는 선곡 수(plays/ 의 기본값).
 export const PAGE_SIZE = 50;
@@ -130,18 +130,29 @@ export function workHistoryHref(musicId, period = ALL) {
 // 시계열 카드(선곡 추이, 선곡 수, 학기별 선곡)의 버킷마다 → 그 주·월·학기의 선곡 기록. filter 의
 // 지기·id 필터는 그대로 두고, 기간은 버킷의 날짜를 응답이 적용한 기간(filters)으로 줄인 직접 지정이다.
 // 그래서 선곡 기록의 '총 N곡'이 차트의 수와 같다. 라벨을 날짜로 읽을 수 없으면 null.
+// 다만 줄지 않은 학기 버킷이 학기 목록(semesters)에 있으면 그 학기(semester_id)로 열어, 선곡 기록의
+// 기간이 '2025-2학기'로 보인다. 백엔드의 학기 범위가 버킷의 날짜와 같으므로 수는 그대로다.
 /**
  * @param {HistoryFilter} filter
  * @param {{ filters?: { bucket?: string, start?: string | null, end?: string | null },
  *   labels: string[] } | null | undefined} envelope 버킷 라벨과 filters(bucket 포함)를 담은 응답
+ * @param {{ id: number, year: number, semester_num: number }[] | null} [semesters] /api/semester
  * @returns {(string | null)[]}
  */
-export function bucketHistoryLinks(filter, envelope) {
+export function bucketHistoryLinks(filter, envelope, semesters = []) {
 	if (!envelope) return [];
 	const bucket = envelope.filters?.bucket ?? '';
 	return envelope.labels.map((label) => {
-		const range = clipRange(bucketRange(bucket, label), envelope.filters);
-		return range ? historyHref({ ...filter, period: CUSTOM, ...range }) : null;
+		const full = bucketRange(bucket, label);
+		const range = clipRange(full, envelope.filters);
+		if (!range) return null;
+		const whole = bucket === 'semester' && range.start === full?.start && range.end === full?.end;
+		const semesterId = whole ? semesterIdOf(label, semesters) : null;
+		return historyHref(
+			semesterId
+				? { ...filter, period: semesterId, start: '', end: '' }
+				: { ...filter, period: CUSTOM, ...range }
+		);
 	});
 }
 

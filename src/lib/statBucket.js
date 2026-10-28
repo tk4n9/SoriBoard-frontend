@@ -104,6 +104,19 @@ export function bucketRange(bucket, label) {
 	return null;
 }
 
+// 학기 버킷 라벨('2025-2') → 학기 목록(/api/semester)에서 같은 연도·학기의 id(문자열).
+// 라벨이 학기 형식이 아니거나 목록에 없으면(목록을 못 받았으면) null.
+/**
+ * @param {string} label
+ * @param {{ id: number, year: number, semester_num: number }[] | null | undefined} semesters
+ */
+export function semesterIdOf(label, semesters) {
+	const m = SEMESTER.exec(label);
+	if (!m || !Array.isArray(semesters)) return null;
+	const found = semesters.find((s) => s.year === Number(m[1]) && s.semester_num === Number(m[2]));
+	return found ? String(found.id) : null;
+}
+
 // 범위를 응답이 적용한 기간(filters.start·end, 없으면 그쪽이 열림) 안으로 줄인다.
 // 예: 이번 학기가 9/1 부터면 주 '2026-08-31' 은 9/1~9/6. 겹치지 않으면 null.
 /**

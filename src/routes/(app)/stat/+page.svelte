@@ -64,6 +64,8 @@
 	// 직접 지정 범위(YYYY-MM-DD, 빈 값 = 그쪽이 열림).
 	let { start: customStart, end: customEnd } =
 		period === CUSTOM ? readStatRange($page.url.searchParams) : { start: '', end: '' };
+	// PeriodSelect 가 불러온 학기 목록: 학기 버킷의 링크를 그 학기(semester_id)로 연다.
+	let semesters = [];
 
 	// 보기가 바뀌면 URL을 바꾼다. 히스토리를 쌓지 않고, 포커스·스크롤도 그대로 둔다.
 	function syncUrl() {
@@ -384,7 +386,7 @@
 			? historyHref({ ...historyFilter, targets: drillWorkTargets(drill, item.id) })
 			: null;
 	// 시계열 카드의 주·월·학기마다: 같은 지기의 그 기간 선곡 기록(표의 기간, 차트의 막대·점).
-	$: timelineLinks = bucketHistoryLinks(historyFilter, timeline);
+	$: timelineLinks = bucketHistoryLinks(historyFilter, timeline, semesters);
 	$: diversityLinks = bucketHistoryLinks(
 		historyFilter,
 		diversity && { filters: diversity.filters, labels: diversity.timeline.labels }
@@ -414,6 +416,7 @@
 				bind:period
 				bind:start={customStart}
 				bind:end={customEnd}
+				bind:semesters
 				{shownRange}
 				on:change={onPeriodChange}
 			/>

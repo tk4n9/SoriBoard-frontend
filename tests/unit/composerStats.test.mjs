@@ -138,3 +138,16 @@ test('composerSemesterLinks opens each 학기 of 학기별 선곡 with this comp
 	assert.deepEqual(composerSemesterLinks(null, timeline), []);
 	assert.deepEqual(composerSemesterLinks('4', null), []);
 });
+
+test('composerSemesterLinks opens a 학기 in the 학기 list by semester_id', () => {
+	const timeline = { filters: { bucket: 'semester' }, labels: ['2024-1', '2025-2'] };
+	const semesters = [{ id: 1, year: 2025, semester_num: 2 }];
+	const links = composerSemesterLinks('4', timeline, semesters);
+	assert.deepEqual(links, [
+		'/stat/history?start=2024-03-01&end=2024-08-31&composer_id=4',
+		'/stat/history?semester_id=1&composer_id=4'
+	]);
+	const read = readHistoryQuery(new URL(links[1], 'http://x').searchParams);
+	assert.equal(read.period, '1');
+	assert.deepEqual(read.targets, [{ param: 'composer_id', id: '4' }]);
+});
