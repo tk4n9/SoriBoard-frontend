@@ -12,6 +12,7 @@
 		readComposerId,
 		composerHistoryHref,
 		composerRankLinks,
+		composerSemesterLinks,
 		composerFacts,
 		semesterSeries,
 		composerWorksTable
@@ -114,9 +115,12 @@
 	// 독주자·지휘자는 이 작곡가의 곡을 그 사람과 튼 선곡 기록으로 간다(표의 이름, 차트의 막대).
 	$: soloistLinks = composerRankLinks(composerId, 'soloists', soloists);
 	$: conductorLinks = composerRankLinks(composerId, 'conductors', conductors);
-	// 막대의 dataIndex 는 뒤집힌 순서다(horizontalBarOption).
-	function openBar(links, e) {
-		const href = links[barItemIndex(e.detail.dataIndex, links.length)];
+	// 학기는 그 학기에 이 작곡가의 곡을 튼 선곡 기록으로 간다.
+	$: semesterLinks = composerSemesterLinks(composerId, timeline);
+	// 막대의 dataIndex 는 뒤집힌 순서다(horizontalBarOption). 학기별 선곡은 뒤집지 않는다.
+	function openBar(links, e, reversed = true) {
+		const i = e.detail.dataIndex;
+		const href = links[reversed ? barItemIndex(i, links.length) : i];
 		if (href) goto(href);
 	}
 	$: worksSubtitle = works
@@ -186,6 +190,8 @@
 					loading={loading.timeline}
 					error={errors.timeline}
 					{fileTag}
+					links={semesterLinks}
+					on:itemclick={(e) => openBar(semesterLinks, e, false)}
 					csvHeaders={['학기', '횟수']}
 				/>
 				<!-- 곡은 처음·마지막 날짜까지 보이도록 차트 없이 표로만 -->

@@ -5,6 +5,7 @@ import {
 	composerHref,
 	composerHistoryHref,
 	composerRankLinks,
+	composerSemesterLinks,
 	composerFacts,
 	semesterSeries,
 	composerWorkName,
@@ -126,4 +127,14 @@ test('the works table ranks ties together and shows each work’s first and last
 	]);
 	// 작곡가를 아직 모르면 이름을 그대로 쓴다.
 	assert.equal(composerWorksTable(works, null).rows[0][1], 'C - 가');
+});
+
+test('composerSemesterLinks opens each 학기 of 학기별 선곡 with this composer', () => {
+	const timeline = { filters: { bucket: 'semester' }, labels: ['2025-1', '2025-2'] };
+	assert.deepEqual(composerSemesterLinks('4', timeline), [
+		'/stat/history?start=2025-03-01&end=2025-08-31&composer_id=4',
+		'/stat/history?start=2025-09-01&end=2026-02-28&composer_id=4'
+	]);
+	assert.deepEqual(composerSemesterLinks(null, timeline), []);
+	assert.deepEqual(composerSemesterLinks('4', null), []);
 });

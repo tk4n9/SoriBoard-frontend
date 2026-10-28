@@ -50,7 +50,7 @@
 		periodRangeText,
 		currentSemesterRange
 	} from '$lib/statPeriod.js';
-	import { historyHref, drillWorkTargets } from '$lib/playHistory.js';
+	import { historyHref, drillWorkTargets, bucketHistoryLinks } from '$lib/playHistory.js';
 	import { composerHref } from '$lib/composerStats.js';
 	import { reportHref } from '$lib/semesterReport.js';
 	import { memberFileText } from '$lib/statFileName.js';
@@ -383,6 +383,16 @@
 		drill && item.id != null
 			? historyHref({ ...historyFilter, targets: drillWorkTargets(drill, item.id) })
 			: null;
+	// 시계열 카드의 주·월·학기마다: 같은 지기의 그 기간 선곡 기록(표의 기간, 차트의 막대·점).
+	$: timelineLinks = bucketHistoryLinks(historyFilter, timeline);
+	$: diversityLinks = bucketHistoryLinks(
+		historyFilter,
+		diversity && { filters: diversity.filters, labels: diversity.timeline.labels }
+	);
+	function openBucket(links, e) {
+		const href = links[e.detail.dataIndex];
+		if (href) goto(href);
+	}
 </script>
 
 <svelte:head>
@@ -552,6 +562,8 @@
 				loading={loading.timeline}
 				error={errors.timeline}
 				{fileTag}
+				links={timelineLinks}
+				on:itemclick={(e) => openBucket(timelineLinks, e)}
 				csvHeaders={['기간', '횟수']}
 			/>
 		</div>
@@ -621,6 +633,8 @@
 				loading={loading.diversity}
 				error={errors.diversity}
 				{fileTag}
+				links={diversityLinks}
+				on:itemclick={(e) => openBucket(diversityLinks, e)}
 				csvHeaders={['기간', '선곡수']}
 			/>
 			<ChartCard
@@ -631,6 +645,8 @@
 				loading={loading.diversity}
 				error={errors.diversity}
 				{fileTag}
+				links={diversityLinks}
+				on:itemclick={(e) => openBucket(diversityLinks, e)}
 				csv={diversityCsv}
 			/>
 		</div>

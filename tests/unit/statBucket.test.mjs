@@ -7,7 +7,9 @@ import {
 	timelineBucketName,
 	timelineView,
 	readDiversityBucket,
-	writeDiversityBucket
+	writeDiversityBucket,
+	bucketRange,
+	clipRange
 } from '../../src/lib/statBucket.js';
 
 const TODAY = '2026-10-26';
@@ -112,4 +114,52 @@ test('writing the toggle leaves 월별 out of the URL and keeps the other keys',
 	const stale = new URLSearchParams('bucket=day');
 	writeDiversityBucket(stale, 'month');
 	assert.equal(stale.toString(), '');
+});
+
+test('bucketRange gives the dates a week label covers, across a month and a year end', () => {
+	assert.deepEqual(bucketRange('week', '2026-08-31'), { start: '2026-08-31', end: '2026-09-06' });
+	assert.deepEqual(bucketRange('week', '2025-12-29'), { start: '2025-12-29', end: '2026-01-04' });
+	assert.deepEqual(bucketRange('week', '2024-02-26'), { start: '2024-02-26', end: '2024-03-03' });
+});
+
+test('bucketRange gives a whole month, with the right last day', () => {
+	assert.deepEqual(bucketRange('month', '2026-09'), { start: '2026-09-01', end: '2026-09-30' });
+	assert.deepEqual(bucketRange('month', '2026-12'), { start: '2026-12-01', end: '2026-12-31' });
+	assert.deepEqual(bucketRange('month', '2024-02'), { start: '2024-02-01', end: '2024-02-29' });
+	assert.deepEqual(bucketRange('month', '2025-02'), { start: '2025-02-01', end: '2025-02-28' });
+});
+
+test('bucketRange follows the backend 학기: 3/1–8/31 and 9/1 to the end of next February', () => {
+	assert.deepEqual(bucketRange('semester', '2026-1'), { start: '2026-03-01', end: '2026-08-31' });
+	assert.deepEqual(bucketRange('semester', '2025-2'), { start: '2025-09-01', end: '2026-02-28' });
+	assert.deepEqual(bucketRange('semester', '2027-2'), { start: '2027-09-01', end: '2028-02-29' });
+});
+
+test('bucketRange answers null for a label it cannot read as that bucket', () => {
+	assert.equal(bucketRange('week', '2026-09'), null);
+	assert.equal(bucketRange('week', '2026-02-30'), null);
+	assert.equal(bucketRange('month', '2026-13'), null);
+	assert.equal(bucketRange('month', '2026-00'), null);
+	assert.equal(bucketRange('month', '2026-1학기'), null);
+	assert.equal(bucketRange('semester', '2026-3'), null);
+	assert.equal(bucketRange('semester', '2026-1학기'), null);
+	assert.equal(bucketRange('day', '2026-09-01'), null);
+	assert.equal(bucketRange('', '2026-09'), null);
+});
+
+test('clipRange keeps a bucket inside the period the answer applied', () => {
+	const week = { start: '2026-08-31', end: '2026-09-06' };
+	assert.deepEqual(clipRange(week, { start: '2026-09-01', end: '2026-10-28' }), {
+		start: '2026-09-01',
+		end: '2026-09-06'
+	});
+	assert.deepEqual(clipRange({ start: '2026-10-26', end: '2026-11-01' }, { end: '2026-10-28' }), {
+		start: '2026-10-26',
+		end: '2026-10-28'
+	});
+	// 전체 기간(filters 에 날짜 없음)이면 그대로.
+	assert.deepEqual(clipRange(week, { scope: 'all' }), week);
+	assert.deepEqual(clipRange(week, null), week);
+	assert.equal(clipRange(week, { start: '2026-09-07' }), null);
+	assert.equal(clipRange(null, { start: '2026-09-01' }), null);
 });

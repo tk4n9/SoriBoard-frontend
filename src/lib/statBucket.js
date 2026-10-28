@@ -62,6 +62,61 @@ export function timelineBucketName(bucket) {
 	return BUCKET_NAMES[/** @type {keyof typeof BUCKET_NAMES} */ (bucket)] ?? '기간별';
 }
 
+const WEEK = /^(\d{4})-(\d{2})-(\d{2})$/;
+const MONTH = /^(\d{4})-(\d{2})$/;
+const SEMESTER = /^(\d{4})-([12])$/;
+
+// UTC 날짜 → 'YYYY-MM-DD'.
+/** @param {Date} date */
+const isoDate = (date) => date.toISOString().slice(0, 10);
+
+// 버킷 라벨이 덮는 날짜(YYYY-MM-DD, 양 끝 포함). 백엔드와 같은 규칙: 주 = 그 월요일부터 7일,
+// 월 = 그달, 학기 = 3/1~8/31 또는 9/1~다음 해 2월 말일. 라벨이 그 단위의 형식이 아니면 null.
+/**
+ * @param {string} bucket 'week' | 'month' | 'semester'
+ * @param {string} label stats/timeline·diversity 의 라벨('2026-08-31', '2026-09', '2026-2')
+ * @returns {{ start: string, end: string } | null}
+ */
+export function bucketRange(bucket, label) {
+	if (bucket === 'week') {
+		const m = WEEK.exec(label);
+		if (!m) return null;
+		const start = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+		if (isoDate(start) !== label) return null;
+		const end = new Date(start);
+		end.setUTCDate(end.getUTCDate() + 6);
+		return { start: label, end: isoDate(end) };
+	}
+	if (bucket === 'month') {
+		const m = MONTH.exec(label);
+		if (!m || Number(m[2]) < 1 || Number(m[2]) > 12) return null;
+		// 다음 달 0일 = 이달 말일.
+		const end = new Date(Date.UTC(Number(m[1]), Number(m[2]), 0));
+		return { start: `${label}-01`, end: isoDate(end) };
+	}
+	if (bucket === 'semester') {
+		const m = SEMESTER.exec(label);
+		if (!m) return null;
+		const year = Number(m[1]);
+		if (m[2] === '1') return { start: `${year}-03-01`, end: `${year}-08-31` };
+		return { start: `${year}-09-01`, end: isoDate(new Date(Date.UTC(year + 1, 2, 0))) };
+	}
+	return null;
+}
+
+// 범위를 응답이 적용한 기간(filters.start·end, 없으면 그쪽이 열림) 안으로 줄인다.
+// 예: 이번 학기가 9/1 부터면 주 '2026-08-31' 은 9/1~9/6. 겹치지 않으면 null.
+/**
+ * @param {{ start: string, end: string } | null} range
+ * @param {{ start?: string | null, end?: string | null } | null | undefined} filters
+ */
+export function clipRange(range, filters) {
+	if (!range) return null;
+	const start = filters?.start && filters.start > range.start ? filters.start : range.start;
+	const end = filters?.end && filters.end < range.end ? filters.end : range.end;
+	return start <= end ? { start, end } : null;
+}
+
 // timeline 응답 → 카드 데이터. 학기 버킷이면 라벨 '2025-1' 을 '2025-1학기' 로 보인다.
 /** @param {{ filters?: { bucket?: string }, labels: string[] }} envelope */
 export function timelineView(envelope) {

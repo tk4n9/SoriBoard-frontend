@@ -13,6 +13,7 @@ import {
 	periodRangeText
 } from './statPeriod.js';
 import { DRILL_CARDS } from './statDrill.js';
+import { bucketRange, clipRange } from './statBucket.js';
 
 // 한 번에 불러오는 선곡 수(plays/ 의 기본값).
 export const PAGE_SIZE = 50;
@@ -124,6 +125,24 @@ export function targetHistoryHref(param, id, period = ALL) {
  */
 export function workHistoryHref(musicId, period = ALL) {
 	return targetHistoryHref('music_id', musicId, period);
+}
+
+// 시계열 카드(선곡 추이, 선곡 수, 학기별 선곡)의 버킷마다 → 그 주·월·학기의 선곡 기록. filter 의
+// 지기·id 필터는 그대로 두고, 기간은 버킷의 날짜를 응답이 적용한 기간(filters)으로 줄인 직접 지정이다.
+// 그래서 선곡 기록의 '총 N곡'이 차트의 수와 같다. 라벨을 날짜로 읽을 수 없으면 null.
+/**
+ * @param {HistoryFilter} filter
+ * @param {{ filters?: { bucket?: string, start?: string | null, end?: string | null },
+ *   labels: string[] } | null | undefined} envelope 버킷 라벨과 filters(bucket 포함)를 담은 응답
+ * @returns {(string | null)[]}
+ */
+export function bucketHistoryLinks(filter, envelope) {
+	if (!envelope) return [];
+	const bucket = envelope.filters?.bucket ?? '';
+	return envelope.labels.map((label) => {
+		const range = clipRange(bucketRange(bucket, label), envelope.filters);
+		return range ? historyHref({ ...filter, period: CUSTOM, ...range }) : null;
+	});
 }
 
 // drill-down 패널의 곡 하나 → 선곡 기록의 id 필터: 그 패널의 대상과 그 곡. 곡의 작곡가는

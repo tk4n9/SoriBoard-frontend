@@ -1,7 +1,7 @@
 // 작곡가 페이지(/stat/composer/<id>): 경로의 id, 머리말 문구, 학기 라벨, 곡 표, 링크.
 // 이 페이지는 기간 없이 클럽의 전체 기록을 본다.
 import { ALL } from './statPeriod.js';
-import { historyHref } from './playHistory.js';
+import { historyHref, bucketHistoryLinks } from './playHistory.js';
 import { DRILL_CARDS } from './statDrill.js';
 import { competitionRanks, formatCount } from './statTable.js';
 
@@ -23,7 +23,16 @@ export const composerHref = (id) => `/stat/composer/${id}`;
  * @param {import('./playHistory.js').HistoryTarget[]} [extra]
  */
 export function composerHistoryHref(id, extra = []) {
-	return historyHref({
+	return historyHref(composerHistoryFilter(id, extra));
+}
+
+/**
+ * @param {number | string} id
+ * @param {import('./playHistory.js').HistoryTarget[]} [extra]
+ * @returns {import('./playHistory.js').HistoryFilter}
+ */
+function composerHistoryFilter(id, extra = []) {
+	return {
 		period: ALL,
 		start: '',
 		end: '',
@@ -32,7 +41,16 @@ export function composerHistoryHref(id, extra = []) {
 		includeMentees: false,
 		requested: '',
 		targets: [{ param: 'composer_id', id: String(id) }, ...extra]
-	});
+	};
+}
+
+// 학기별 선곡의 학기마다 → 그 학기에 이 작곡가의 곡을 튼 선곡 기록(stats/timeline 의 학기 버킷).
+/**
+ * @param {number | string | null} id
+ * @param {{ filters?: { bucket?: string }, labels: string[] } | null | undefined} timeline
+ */
+export function composerSemesterLinks(id, timeline) {
+	return id ? bucketHistoryLinks(composerHistoryFilter(id), timeline) : [];
 }
 
 // 순위 카드(독주자·지휘자)의 항목마다 → 이 작곡가의 곡을 그 대상과 튼 선곡 기록. 이름이 아니라

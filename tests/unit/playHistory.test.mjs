@@ -24,7 +24,8 @@ import {
 	fetchAllPlays,
 	playCsvRow,
 	semesterRangeParams,
-	historyPeriod
+	historyPeriod,
+	bucketHistoryLinks
 } from '../../src/lib/playHistory.js';
 
 const read = (search) => readHistoryQuery(new URLSearchParams(search));
@@ -617,4 +618,57 @@ test('historyFileTags clips long names and search words to 40 characters', () =>
 	const emoji = '🎻'.repeat(40);
 	assert.deepEqual(historyFileTags({ ...DEFAULT, q: emoji }), ['', `검색 ${emoji}`]);
 	assert.deepEqual(historyFileTags({ ...DEFAULT, q: `${emoji}🎻` }), ['', `검색 ${emoji}…`]);
+});
+
+test('bucketHistoryLinks opens each week of the timeline, clipped to the period, for the same 지기', () => {
+	const filter = {
+		period: 'current',
+		start: '',
+		end: '',
+		q: '',
+		userId: '12',
+		includeMentees: true,
+		requested: ''
+	};
+	const timeline = {
+		filters: { start: '2026-09-01', end: '2026-10-28', bucket: 'week', user_id: 12 },
+		labels: ['2026-08-31', '2026-09-07', '2026-10-26']
+	};
+	const links = bucketHistoryLinks(filter, timeline);
+	assert.deepEqual(links, [
+		'/stat/history?start=2026-09-01&end=2026-09-06&user_id=12&include_mentees=true',
+		'/stat/history?start=2026-09-07&end=2026-09-13&user_id=12&include_mentees=true',
+		'/stat/history?start=2026-10-26&end=2026-10-28&user_id=12&include_mentees=true'
+	]);
+	const read = readHistoryQuery(new URL(links[0], 'http://x').searchParams);
+	assert.equal(read.period, 'custom');
+	assert.equal(read.start, '2026-09-01');
+	assert.equal(read.end, '2026-09-06');
+});
+
+test('bucketHistoryLinks keeps the id filters and reads 학기 and month buckets', () => {
+	const filter = {
+		period: 'all',
+		start: '',
+		end: '',
+		q: '',
+		userId: null,
+		includeMentees: false,
+		requested: '',
+		targets: [{ param: 'composer_id', id: '4' }]
+	};
+	assert.deepEqual(
+		bucketHistoryLinks(filter, { filters: { bucket: 'semester' }, labels: ['2025-2'] }),
+		['/stat/history?start=2025-09-01&end=2026-02-28&composer_id=4']
+	);
+	assert.deepEqual(
+		bucketHistoryLinks(filter, {
+			filters: { bucket: 'month', start: '2026-03-01', end: '2026-08-31' },
+			labels: ['2026-03', 'bad']
+		}),
+		['/stat/history?start=2026-03-01&end=2026-03-31&composer_id=4', null]
+	);
+	assert.deepEqual(bucketHistoryLinks(filter, null), []);
+	// bucket 이 없으면 라벨을 날짜로 읽을 수 없으므로 링크도 없다.
+	assert.deepEqual(bucketHistoryLinks(filter, { labels: ['2026-03'] }), [null]);
 });
