@@ -55,6 +55,7 @@
 	import { composerHref } from '$lib/composerStats.js';
 	import { reportHref } from '$lib/semesterReport.js';
 	import { memberFileText } from '$lib/statFileName.js';
+	import { pageTitle, periodTitle } from '$lib/statTitle.js';
 
 	// 범위·지기·견습 포함·기간·주별/월별·열린 drill-down 패널은 URL에도 둔다(링크로 같은 보기를 연다). 페이지가 시작될 때 한 번만 읽는다.
 	const initial = readStatQuery($page.url.searchParams);
@@ -307,10 +308,15 @@
 			: semesterRange ?? { start: startDate, end: endDate };
 	// 내려받는 파일 이름에 넣을 보기: 머리말의 기간과, 개인이면 지기(statFileName.js).
 	let userName = '';
-	$: fileTag = [
-		periodText,
-		scope === 'individual' ? memberFileText({ userId, name: userName, includeMentees }) : ''
-	];
+	$: memberText =
+		scope === 'individual' ? memberFileText({ userId, name: userName, includeMentees }) : '';
+	$: fileTag = [periodText, memberText];
+	// 탭 제목에도 보기를 넣는다(기본값인 이번 학기·전체는 빼고): '가상이 · 2025-2학기 · 통계'.
+	$: tabTitle = pageTitle(
+		memberText,
+		periodTitle({ period, start: customStart, end: customEnd }, semesters),
+		'통계'
+	);
 	$: subtitleFor = (envelope) =>
 		envelope ? `${scopeLabel} · 총 ${envelope.total_plays.toLocaleString()}곡` : '';
 
@@ -402,7 +408,7 @@
 </script>
 
 <svelte:head>
-	<title>통계</title>
+	<title>{tabTitle}</title>
 </svelte:head>
 
 <div class="stat-page">

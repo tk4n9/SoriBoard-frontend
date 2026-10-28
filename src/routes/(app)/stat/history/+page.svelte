@@ -9,6 +9,7 @@
 	import { downloadCsvTable } from '$lib/csvTable.js';
 	import { todayStamp } from '$lib/csv.js';
 	import { downloadName, memberFileText } from '$lib/statFileName.js';
+	import { pageTitle, periodTitle } from '$lib/statTitle.js';
 	import {
 		EXPORT_PAGE_SIZE,
 		PLAY_CSV_HEADERS,
@@ -258,10 +259,18 @@
 		requested
 	});
 	$: hasMore = count !== null && offset < count;
+	// 탭 제목: id 필터(이름을 찾기 전에는 '작곡가 #12'), 지기, 기간(이번 학기는 빼고).
+	// 검색어와 신청곡은 넣지 않는다: '가상 작곡가 D · 전체 기간 · 선곡 기록'.
+	$: tabTitle = pageTitle(
+		...targets.map((t) => targetNames[t.param] || targetText(t, null)),
+		memberFileText({ userId, name: userName, includeMentees }),
+		periodTitle({ period, start: customStart, end: customEnd }, semesters),
+		'선곡 기록'
+	);
 </script>
 
 <svelte:head>
-	<title>선곡 기록</title>
+	<title>{tabTitle}</title>
 </svelte:head>
 
 <div class="history-page">
