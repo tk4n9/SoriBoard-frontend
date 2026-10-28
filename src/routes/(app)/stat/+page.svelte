@@ -629,6 +629,10 @@
 				<div class="kpi-label">고유 곡 수</div>
 			</div>
 		</div>
+		<!-- 칸의 '—'는 잴 것이 없을 때도 쓰므로, 불러오지 못했으면 따로 알린다 -->
+		{#if errors.diversityTiles}
+			<p class="kpi-error">선곡 다양성을 불러오지 못했습니다.</p>
+		{/if}
 
 		<div class="chart-grid">
 			<ChartCard
