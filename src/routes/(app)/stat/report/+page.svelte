@@ -6,7 +6,7 @@
 	import ReportTable from '$lib/components/stat/ReportTable.svelte';
 	import { eraPieOption } from '$lib/chartOptions.js';
 	import { rankTable, formatCount } from '$lib/statTable.js';
-	import { sortSemesters, semesterLabel, periodRangeText } from '$lib/statPeriod.js';
+	import { sortSemesters, semesterLabel } from '$lib/statPeriod.js';
 	import { composerHref } from '$lib/composerStats.js';
 	import { workHistoryHref, targetHistoryHref } from '$lib/playHistory.js';
 	import { DRILL_CARDS } from '$lib/statDrill.js';
@@ -18,7 +18,8 @@
 		mixTable,
 		mixSubtitle,
 		loadWithPrevious,
-		firstsTable
+		firstsTable,
+		reportRangeText
 	} from '$lib/semesterReport.js';
 
 	// 한 학기의 결산(클럽 전체). 학기는 URL(semester_id)에 두고, 없으면 가장 최근 학기다.
@@ -144,7 +145,8 @@
 
 	$: label = semester ? semesterLabel(semester) : '';
 	$: previousLabel = previous ? semesterLabel(previous) : '';
-	$: rangeText = summary ? periodRangeText(summary.filters) : '';
+	// 요약을 받기 전(또는 받지 못하면)에는 학기 목록의 연도·학기로 짐작한 날짜(semesterReport.js).
+	$: rangeText = reportRangeText(summary, semester);
 	const total = (envelope) => (envelope ? `총 ${envelope.total_plays.toLocaleString()}곡` : '');
 	const count = (v) => (v == null ? '—' : formatCount(v));
 	$: empty = summary && summary.total_plays === 0;

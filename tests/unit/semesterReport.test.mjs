@@ -9,7 +9,8 @@ import {
 	mixTable,
 	mixSubtitle,
 	loadWithPrevious,
-	firstsTable
+	firstsTable,
+	reportRangeText
 } from '../../src/lib/semesterReport.js';
 
 // sortSemesters 순서(최신 학기 먼저)
@@ -211,4 +212,24 @@ test('mixSubtitle names both 학기, a missing one, or a failed one', () => {
 		),
 		'2025-2학기 총 1,903곡 · 지난 학기(2025-1학기)를 불러오지 못했습니다'
 	);
+});
+
+test('reportRangeText shows the echoed range, else the 학기 dates from the list', () => {
+	const spring = { id: 4, year: 2026, semester_num: 1 };
+	const autumn = { id: 1, year: 2025, semester_num: 2 };
+	const echoed = { filters: { semester_id: '4', start: '2026-03-01', end: '2026-08-31' } };
+	assert.equal(reportRangeText(echoed, spring), '2026-03-01 ~ 2026-08-31');
+	// The echo wins over the guess.
+	const odd = { filters: { start: '2026-03-02', end: '2026-08-30' } };
+	assert.equal(reportRangeText(odd, spring), '2026-03-02 ~ 2026-08-30');
+	// Before the summary answers, or when it failed: the 학기's own dates.
+	assert.equal(reportRangeText(null, spring), '2026-03-01 ~ 2026-08-31');
+	assert.equal(reportRangeText(undefined, autumn), '2025-09-01 ~ 2026-02-28');
+	assert.equal(
+		reportRangeText(null, { id: 9, year: 2027, semester_num: 2 }),
+		'2027-09-01 ~ 2028-02-29'
+	);
+	// No 학기 yet, or one the rule does not know: no dates.
+	assert.equal(reportRangeText(null, null), '');
+	assert.equal(reportRangeText(null, { id: 7, year: 2026, semester_num: 3 }), '');
 });

@@ -1,6 +1,8 @@
 // 학기 결산(/stat/report?semester_id=<id>): 학기 고르기, 지난 학기, 시대·장르 비교 표,
 // 처음 튼 작곡가·곡 표, 링크. 결산은 클럽 전체의 기록이다(지기별 순위는 없다).
 import { formatCount, sharePercents, formatShare, SHARE_PRECISION } from './statTable.js';
+import { periodRangeText } from './statPeriod.js';
+import { bucketRange } from './statBucket.js';
 
 const ID = /^[1-9]\d*$/;
 
@@ -31,6 +33,18 @@ export function pickSemester(raw, sorted) {
 export function previousSemester(semester, sorted) {
 	const i = sorted.findIndex((s) => s.id === semester.id);
 	return i >= 0 ? sorted[i + 1] ?? null : null;
+}
+
+// 머리말의 날짜 범위: 요약(stats/summary)이 돌려준 적용 기간. 그 전(또는 요약을 받지 못하면)에는
+// 학기의 연도·학기로 짐작한 날짜를 보인다(백엔드의 semester_id 와 같은 규칙, statBucket.js).
+/**
+ * @param {{ filters?: { start?: string, end?: string } } | null | undefined} summary
+ * @param {{ year: number, semester_num: number } | null} semester
+ */
+export function reportRangeText(summary, semester) {
+	if (summary?.filters) return periodRangeText(summary.filters);
+	if (!semester) return '';
+	return periodRangeText(bucketRange('semester', `${semester.year}-${semester.semester_num}`));
 }
 
 // 시대·장르처럼 지난 학기와 견주는 카드의 응답 한 쌍. 두 요청은 함께 보낸다.
