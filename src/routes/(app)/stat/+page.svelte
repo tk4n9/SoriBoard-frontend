@@ -56,6 +56,15 @@
 	import { reportHref } from '$lib/semesterReport.js';
 	import { memberFileText } from '$lib/statFileName.js';
 	import { pageTitle, periodTitle } from '$lib/statTitle.js';
+	import {
+		tasteComposers,
+		tasteTable,
+		tasteCsv,
+		tasteNote,
+		TASTE_FETCH_LIMIT,
+		TASTE_MIN_PLAYS,
+		TASTE_MIN_RATIO
+	} from '$lib/statTaste.js';
 
 	// 범위·지기·견습 포함·기간·주별/월별·열린 drill-down 패널은 URL에도 둔다(링크로 같은 보기를 연다). 페이지가 시작될 때 한 번만 읽는다.
 	const initial = readStatQuery($page.url.searchParams);
@@ -99,8 +108,8 @@
 	// 백엔드가 적용했다고 돌려준 기간(filters). 기간이 바뀔 때만 비운다.
 	let appliedFilters = null;
 
-	// 현재 필터를 쿼리스트링으로.
-	function buildQuery(extra = {}) {
+	// 현재 필터를 쿼리스트링으로. member 가 false 면 지기를 빼고 같은 기간의 클럽 전체(취향 카드의 비교 대상).
+	function buildQuery(extra = {}, member = true) {
 		const params = new URLSearchParams();
 		if (period === CURRENT) {
 			if (startDate) params.set('start', startDate);
@@ -111,7 +120,7 @@
 		} else if (period !== ALL) {
 			params.set('semester_id', period);
 		}
-		if (scope === 'individual' && userId) {
+		if (member && scope === 'individual' && userId) {
 			params.set('user_id', userId);
 			if (includeMentees) params.set('include_mentees', 'true');
 		}
@@ -120,8 +129,8 @@
 		return s ? `?${s}` : '';
 	}
 
-	async function getJson(endpoint, extra) {
-		const res = await fetch(`/api/stats/${endpoint}${buildQuery(extra)}`);
+	async function getJson(endpoint, extra, member) {
+		const res = await fetch(`/api/stats/${endpoint}${buildQuery(extra, member)}`);
 		if (!res.ok) throw new Error(`${endpoint} 실패`);
 		return res.json();
 	}
@@ -136,11 +145,26 @@
 		orchestras: () => getJson('orchestras', { limit: 10 }),
 		timeline: () => getJson('timeline', { bucket: timelineBucket }),
 		eras: () => getJson('eras'),
-		diversity: () => getJson('diversity', { bucket: diversityBucket })
+		diversity: () => getJson('diversity', { bucket: diversityBucket }),
+		// 개인 범위만: 지기와 클럽의 작곡가를 함께 불러 견준다(statTaste.js).
+		taste: async () => {
+			const limit = { limit: TASTE_FETCH_LIMIT };
+			const [mine, club] = await Promise.all([
+				getJson('composers', limit),
+				getJson('composers', limit, false)
+			]);
+			return tasteComposers(mine, club);
+		}
 	};
 	// 다른 카드의 응답에서 꺼내 그리는 카드.
 	const pickCard = { genres: genreDistribution, diversityTiles };
 	const CARD_KEYS = [...Object.keys(cardRequests), ...Object.keys(pickCard)];
+	// 전체 범위에서는 취향 카드가 없으므로 부르지 않고, 개인 범위에서 진행 중이던 응답은 버린다.
+	function scopeKeys() {
+		if (scope === 'individual') return CARD_KEYS;
+		requests.begin(['taste']);
+		return CARD_KEYS.filter((key) => key !== 'taste');
+	}
 
 	/** @type {Record<string, any>} */
 	let data = {};
@@ -202,7 +226,7 @@
 	const loadAll = () => {
 		timelineBucket = nextTimelineBucket();
 		loadDrill();
-		return load(CARD_KEYS);
+		return load(scopeKeys());
 	};
 
 	// drill-down: 순위 카드의 막대나 표의 행 → 그 대상의 곡(같은 기간·범위, statDrill.js).
@@ -347,6 +371,15 @@
 			? `시대 미상 비율 ${Math.round(eras.unknown_share * 100)}% — 일부 작곡가 데이터 미반영`
 			: '';
 	$: genreOpt = genres && eraPieOption(genres, '장르별 분포', subtitleFor(genres));
+	// 취향: 클럽보다 비중이 큰 작곡가와 그 배율(statTaste.js).
+	$: taste = data.taste;
+	$: tasteOpt =
+		taste &&
+		horizontalBarOption(
+			taste,
+			'취향',
+			`개인 · 클럽 대비 비중(배) · ${TASTE_MIN_PLAYS}번 이상, ${TASTE_MIN_RATIO}배 이상`
+		);
 
 	// 다양성: 버킷 라벨, 선곡 수 막대, 다양성(고른정도) 추이.
 	$: bucketLabel = diversityBucket === 'week' ? '주별' : '월별';
@@ -605,6 +638,20 @@
 				on:itemclick={(e) => openBucket(timelineLinks, e)}
 				csvHeaders={['기간', '횟수']}
 			/>
+			{#if scope === 'individual'}
+				<ChartCard
+					title="취향"
+					option={tasteOpt}
+					data={taste}
+					loading={loading.taste}
+					error={errors.taste}
+					retry={() => retry('taste')}
+					{fileTag}
+					note={tasteNote(taste)}
+					table={taste && tasteTable(taste)}
+					csv={taste && tasteCsv(taste)}
+				/>
+			{/if}
 		</div>
 		{#if drill}
 			{#key drill}
