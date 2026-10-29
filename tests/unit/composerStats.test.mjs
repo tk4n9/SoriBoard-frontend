@@ -2,7 +2,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
 	readComposerId,
+	readComposerPeriod,
+	writeComposerPeriod,
 	composerHref,
+	composerPeriodParams,
+	composerPeriodName,
+	composerStatHref,
+	composerWorkHref,
 	composerHistoryHref,
 	composerRankLinks,
 	composerSemesterLinks,
@@ -11,7 +17,7 @@ import {
 	composerWorkName,
 	composerWorksTable
 } from '../../src/lib/composerStats.js';
-import { readHistoryQuery } from '../../src/lib/playHistory.js';
+import { readHistoryQuery, workHistoryHref } from '../../src/lib/playHistory.js';
 
 test('the route id must be a positive integer', () => {
 	assert.equal(readComposerId('12'), '12');
@@ -150,4 +156,151 @@ test('composerSemesterLinks opens a 학기 in the 학기 list by semester_id', (
 	const read = readHistoryQuery(new URL(links[1], 'http://x').searchParams);
 	assert.equal(read.period, '1');
 	assert.deepEqual(read.targets, [{ param: 'composer_id', id: '4' }]);
+});
+
+const query = (search) => new URLSearchParams(search);
+const SEMESTER = { period: '7', start: '', end: '' };
+const RANGE = { period: 'custom', start: '2025-10-01', end: '2025-11-30' };
+
+test('the period defaults to 전체 기간; period=current is 이번 학기', () => {
+	const all = { period: 'all', start: '', end: '' };
+	assert.deepEqual(readComposerPeriod(query('')), all);
+	assert.deepEqual(readComposerPeriod(query('period=all')), all);
+	assert.deepEqual(readComposerPeriod(query('period=current')), {
+		period: 'current',
+		start: '',
+		end: ''
+	});
+	assert.deepEqual(readComposerPeriod(query('semester_id=7')), SEMESTER);
+	assert.deepEqual(readComposerPeriod(query('start=2025-10-01&end=2025-11-30')), RANGE);
+	assert.deepEqual(readComposerPeriod(query('start=2025-10-01')), {
+		period: 'custom',
+		start: '2025-10-01',
+		end: ''
+	});
+	// 학기가 직접 지정보다, 직접 지정이 period 보다 먼저다(통계와 같다).
+	assert.deepEqual(readComposerPeriod(query('semester_id=7&start=2025-10-01')), SEMESTER);
+	assert.deepEqual(readComposerPeriod(query('period=current&end=2025-11-30')), {
+		period: 'custom',
+		start: '',
+		end: '2025-11-30'
+	});
+	for (const bad of [
+		'semester_id=0',
+		'semester_id=abc',
+		'start=2025-02-30',
+		'end=2025-1-1',
+		'period=now',
+		'period=custom'
+	]) {
+		assert.deepEqual(readComposerPeriod(query(bad)), all, bad);
+	}
+});
+
+test('writing the period round-trips, and 전체 기간 writes nothing', () => {
+	for (const filter of [
+		{ period: 'current', start: '', end: '' },
+		SEMESTER,
+		RANGE,
+		{ period: 'custom', start: '', end: '2025-11-30' }
+	]) {
+		const params = query('');
+		writeComposerPeriod(params, filter);
+		assert.deepEqual(readComposerPeriod(params), filter, params.toString());
+	}
+	const params = query('semester_id=3&period=current&start=2025-01-01&x=1');
+	writeComposerPeriod(params, { period: 'all' });
+	assert.equal(params.toString(), 'x=1');
+	writeComposerPeriod(params, SEMESTER);
+	assert.equal(params.toString(), 'x=1&semester_id=7');
+	writeComposerPeriod(params);
+	assert.equal(params.toString(), 'x=1');
+});
+
+test('composerHref keeps the bare path for 전체 기간 and adds any other period', () => {
+	assert.equal(composerHref(5), '/stat/composer/5');
+	assert.equal(composerHref(5, { period: 'all', start: '', end: '' }), '/stat/composer/5');
+	assert.equal(composerHref(5, { period: '7' }), '/stat/composer/5?semester_id=7');
+	assert.equal(composerHref(5, { period: 'current' }), '/stat/composer/5?period=current');
+	assert.equal(composerHref(5, RANGE), '/stat/composer/5?start=2025-10-01&end=2025-11-30');
+	// 통계의 기간 상태 그대로: 직접 지정이 아니면 남은 날짜는 쓰지 않는다.
+	assert.equal(
+		composerHref(5, { period: '7', start: '2025-10-01', end: '' }),
+		'/stat/composer/5?semester_id=7'
+	);
+});
+
+test('the request sends 이번 학기 as its dates, like 통계', () => {
+	const current = { start: '2026-09-01', end: '2026-10-29' };
+	assert.deepEqual(composerPeriodParams({ period: 'all' }, current), {});
+	assert.deepEqual(composerPeriodParams({ period: 'current' }, current), current);
+	assert.deepEqual(composerPeriodParams(SEMESTER, current), { semester_id: '7' });
+	assert.deepEqual(composerPeriodParams(RANGE, current), {
+		start: '2025-10-01',
+		end: '2025-11-30'
+	});
+	assert.deepEqual(
+		composerPeriodParams({ period: 'custom', start: '', end: '2025-11-30' }, current),
+		{ end: '2025-11-30' }
+	);
+});
+
+test('the period name for subtitles and the tab title', () => {
+	const semesters = [{ id: 7, year: 2025, semester_num: 2 }];
+	assert.equal(composerPeriodName({ period: 'all' }, semesters), '전체 기간');
+	assert.equal(composerPeriodName({ period: 'current' }, semesters), '이번 학기');
+	assert.equal(composerPeriodName(SEMESTER, semesters), '2025-2학기');
+	assert.equal(composerPeriodName(SEMESTER, []), '');
+	assert.equal(composerPeriodName(RANGE, null), '2025-10-01 ~ 2025-11-30');
+});
+
+test('links carry a 학기 or 직접 지정 period, and keep today’s URLs without one', () => {
+	assert.equal(composerHistoryHref(7, [], SEMESTER), '/stat/history?semester_id=7&composer_id=7');
+	assert.equal(
+		composerHistoryHref(7, [], RANGE),
+		'/stat/history?start=2025-10-01&end=2025-11-30&composer_id=7'
+	);
+	// 이번 학기는 선곡 기록의 기본값이라 남기지 않는다.
+	assert.equal(composerHistoryHref(7, [], { period: 'current' }), '/stat/history?composer_id=7');
+	assert.equal(composerHistoryHref(7, []), '/stat/history?period=all&composer_id=7');
+
+	const soloists = { items: [{ id: 2, name: 'a' }] };
+	assert.deepEqual(composerRankLinks(7, 'soloists', soloists, RANGE), [
+		'/stat/history?start=2025-10-01&end=2025-11-30&composer_id=7&player_id=2'
+	]);
+	assert.deepEqual(composerRankLinks(7, 'soloists', soloists, SEMESTER), [
+		'/stat/history?semester_id=7&composer_id=7&player_id=2'
+	]);
+
+	assert.equal(composerWorkHref(11), workHistoryHref(11));
+	assert.equal(composerWorkHref(11, SEMESTER), '/stat/history?semester_id=7&music_id=11');
+	assert.equal(
+		composerWorkHref(11, RANGE),
+		'/stat/history?start=2025-10-01&end=2025-11-30&music_id=11'
+	);
+
+	assert.equal(composerStatHref(), '/stat?period=all');
+	assert.equal(composerStatHref({ period: 'current' }), '/stat');
+	assert.equal(composerStatHref(SEMESTER), '/stat?semester_id=7');
+	assert.equal(composerStatHref(RANGE), '/stat?start=2025-10-01&end=2025-11-30');
+});
+
+test('학기별 선곡 links clip to the period the answer applied', () => {
+	// 직접 지정 2025-10-01 ~ 2025-11-30: 학기 버킷 하나, 그 범위로 줄인 날짜로 연다.
+	const timeline = {
+		filters: { bucket: 'semester', start: '2025-10-01', end: '2025-11-30' },
+		labels: ['2025-2']
+	};
+	const semesters = [{ id: 1, year: 2025, semester_num: 2 }];
+	assert.deepEqual(composerSemesterLinks('4', timeline, semesters, RANGE), [
+		'/stat/history?start=2025-10-01&end=2025-11-30&composer_id=4'
+	]);
+	// 학기 하나: 줄지 않은 버킷은 그 학기(semester_id)로 연다.
+	const whole = {
+		filters: { bucket: 'semester', start: '2025-09-01', end: '2026-02-28' },
+		labels: ['2025-2']
+	};
+	assert.deepEqual(composerSemesterLinks('4', whole, semesters, { period: '1' }), [
+		'/stat/history?semester_id=1&composer_id=4'
+	]);
 });
