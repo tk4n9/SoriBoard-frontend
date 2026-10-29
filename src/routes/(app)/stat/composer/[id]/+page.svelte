@@ -90,6 +90,23 @@
 		}
 	}
 
+	function loadCard(key, id, gen) {
+		cardRequests[key](id)
+			.then((result) => {
+				if (gen !== cardGeneration) return;
+				data[key] = result;
+				appliedFilters = result.filters;
+			})
+			.catch((e) => {
+				if (gen !== cardGeneration) return;
+				console.error(`작곡가 통계 로딩 실패 (${key})`, e);
+				errors[key] = '불러오지 못했습니다';
+			})
+			.finally(() => {
+				if (gen === cardGeneration) loading[key] = false;
+			});
+	}
+
 	// 카드만 다시 부른다(기간이 바뀌면 작곡가 정보는 그대로다).
 	function loadCards() {
 		const id = readComposerId($page.params.id);
@@ -99,22 +116,23 @@
 		appliedFilters = null;
 		loading = Object.fromEntries(CARD_KEYS.map((key) => [key, Boolean(id)]));
 		if (!id) return;
-		for (const key of CARD_KEYS) {
-			cardRequests[key](id)
-				.then((result) => {
-					if (gen !== cardGeneration) return;
-					data[key] = result;
-					appliedFilters = result.filters;
-				})
-				.catch((e) => {
-					if (gen !== cardGeneration) return;
-					console.error(`작곡가 통계 로딩 실패 (${key})`, e);
-					errors[key] = '불러오지 못했습니다';
-				})
-				.finally(() => {
-					if (gen === cardGeneration) loading[key] = false;
-				});
-		}
+		for (const key of CARD_KEYS) loadCard(key, id, gen);
+	}
+
+	// '다시 시도': 그 카드만 지금 기간으로 다시 부른다. cardGeneration 은 그대로 두어 다른 카드의 요청을
+	// 살리고, 그 사이 기간이나 작곡가를 바꾸면 이 요청의 늦은 응답도 버린다.
+	// 단추는 사라지므로, 단추에 있던 포커스는 먼저 target(많이 튼 곡은 그 section, 글줄은 h1)으로 옮긴다.
+	let heading;
+	function retry(key, e, target) {
+		if (e && document.activeElement === e.currentTarget) target?.focus();
+		loading[key] = true;
+		errors[key] = '';
+		loadCard(key, composerId, cardGeneration);
+	}
+	function retryComposer(e) {
+		if (document.activeElement === e.currentTarget) heading?.focus();
+		composerError = '';
+		loadComposer(composerId, generation);
 	}
 
 	function loadAll() {
@@ -212,7 +230,7 @@
 <div class="composer-page">
 	<header class="page-header">
 		<div class="title-group">
-			<h1>{title}</h1>
+			<h1 tabindex="-1" bind:this={heading}>{title}</h1>
 			{#if composer}
 				<span class="facts">{composerFacts(composer)}</span>
 			{/if}
@@ -242,7 +260,12 @@
 		<div class="empty-hint">작곡가를 찾을 수 없습니다.</div>
 	{:else}
 		{#if composerError}
-			<p class="kpi-error">{composerError}</p>
+			<p class="kpi-error">
+				{composerError}
+				<button class="tool-btn" on:click={retryComposer} aria-label="작곡가 정보 다시 시도">
+					다시 시도
+				</button>
+			</p>
 		{/if}
 		<div class="kpi-row">
 			<div class="kpi">
@@ -267,7 +290,16 @@
 			</div>
 		</div>
 		{#if errors.summary}
-			<p class="kpi-error">요약을 불러오지 못했습니다.</p>
+			<p class="kpi-error">
+				요약을 불러오지 못했습니다.
+				<button
+					class="tool-btn"
+					on:click={(e) => retry('summary', e, heading)}
+					aria-label="요약 다시 시도"
+				>
+					다시 시도
+				</button>
+			</p>
 		{/if}
 
 		{#if summary && summary.total_plays === 0}
@@ -284,17 +316,27 @@
 					data={timelineData}
 					loading={loading.timeline}
 					error={errors.timeline}
+					retry={() => retry('timeline')}
 					{fileTag}
 					links={semesterLinks}
 					on:itemclick={(e) => openBar(semesterLinks, e, false)}
 					csvHeaders={['학기', '횟수']}
 				/>
 				<!-- 곡은 처음·마지막 날짜까지 보이도록 차트 없이 표로만 -->
-				<section class="card" aria-label="많이 튼 곡">
+				<section class="card" tabindex="-1" aria-label="많이 튼 곡">
 					{#if loading.works || errors.works || !worksTable}
 						<!-- 표가 없으면 제목도 없으므로, 차트 카드처럼 어느 카드인지 여기서 밝힌다. -->
 						<div class="placeholder" class:error={!loading.works && errors.works}>
 							{placeholderText('많이 튼 곡', { loading: loading.works, error: errors.works })}
+							{#if !loading.works && errors.works}
+								<button
+									class="tool-btn"
+									on:click={(e) => retry('works', e, e.currentTarget.closest('section'))}
+									aria-label="많이 튼 곡 다시 시도"
+								>
+									다시 시도
+								</button>
+							{/if}
 						</div>
 					{:else}
 						<DataTable
@@ -311,6 +353,7 @@
 					data={soloists}
 					loading={loading.soloists}
 					error={errors.soloists}
+					retry={() => retry('soloists')}
 					{fileTag}
 					table={soloists && rankTable(soloists, '연주자')}
 					links={soloistLinks}
@@ -323,6 +366,7 @@
 					data={conductors}
 					loading={loading.conductors}
 					error={errors.conductors}
+					retry={() => retry('conductors')}
 					{fileTag}
 					table={conductors && rankTable(conductors, '지휘자')}
 					links={conductorLinks}
@@ -420,6 +464,23 @@
 		font-size: var(--small-medium-font-size, 13px);
 		color: var(--secondary-secondary-800, #95560d);
 	}
+	/* 카드(ChartCard)의 단추와 같은 모양 */
+	.tool-btn {
+		font-family: var(--small-medium-font-family, 'Noto Sans KR', sans-serif);
+		font-size: var(--small-medium-font-size, 13px);
+		color: var(--primary-primary-800, #6a5134);
+		background: var(--secondary-secondary-100, #fef9f3);
+		border: 1px solid var(--primary-primary-600, #c8ad8f);
+		border-radius: 4px;
+		padding: 3px 8px;
+		cursor: pointer;
+	}
+	.tool-btn:hover {
+		background: var(--secondary-secondary-200, #fdf1e4);
+	}
+	.kpi-error .tool-btn {
+		margin-left: 8px;
+	}
 	.chart-grid {
 		display: grid;
 		grid-template-columns: repeat(2, 1fr);
@@ -436,6 +497,8 @@
 	}
 	.placeholder {
 		display: flex;
+		flex-direction: column;
+		gap: 10px;
 		align-items: center;
 		justify-content: center;
 		height: 340px;
