@@ -21,11 +21,20 @@
 	export let links = []; // 주면 표의 이름 칸이 그 주소로 가는 링크가 된다(행마다, DataTable 의 links).
 	/** @type {string | string[]} */
 	export let fileTag = ''; // 내려받는 파일 이름에서 제목 뒤에 붙는 보기(기간, 지기 등, statFileName.js)
+	/** @type {(() => void) | null} */
+	export let retry = null; // 주면 실패한 카드에 '다시 시도' 단추가 보인다.
 
 	let chartRef;
 	// 표로 보기: 캔버스는 키보드·화면 낭독기로 읽을 수 없으므로 같은 수치를 표로 보인다.
 	// 다시 불러와도 그대로 두고, 차트는 숨긴 채 남겨 PNG 저장이 계속 된다.
 	let showTable = false;
+	let viewToggle;
+
+	// 누르면 단추가 사라지므로, 포커스가 본문으로 떨어지지 않도록 먼저 이 카드의 '표로 보기'로 옮긴다.
+	function onRetry() {
+		viewToggle?.focus();
+		retry();
+	}
 
 	$: hasData = data && data.labels && data.labels.length > 0;
 	// 불러오는 동안 data 는 아직 이전 필터의 것이고 차트는 내려가 있으므로 저장을 막는다.
@@ -51,6 +60,7 @@
 
 <div class="card">
 	<button
+		bind:this={viewToggle}
 		class="tool-btn view-toggle"
 		class:active={showTable}
 		aria-pressed={showTable}
@@ -86,6 +96,11 @@
 			<!-- 제목은 차트가 그리므로, 실패하거나 비었으면 어느 카드인지 여기서 밝힌다. -->
 			<div class="placeholder" class:error={!loading && error}>
 				{placeholderText(title, { loading, error })}
+				{#if !loading && error && retry}
+					<button class="tool-btn" on:click={onRetry} aria-label={`${title} 다시 시도`}>
+						다시 시도
+					</button>
+				{/if}
 			</div>
 		{:else}
 			<div class="chart-view" class:hidden={showTable && shownTable}>
@@ -180,6 +195,8 @@
 	}
 	.placeholder {
 		display: flex;
+		flex-direction: column;
+		gap: 10px;
 		align-items: center;
 		justify-content: center;
 		height: 340px;

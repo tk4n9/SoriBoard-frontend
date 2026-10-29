@@ -16,7 +16,7 @@
 	} from '$lib/chartOptions.js';
 	import { readStatQuery, statQueryHref } from '$lib/statQuery.js';
 	import { createLatestRequests } from '$lib/latestRequest.js';
-	import { requestGroups, genreDistribution, diversityTiles } from '$lib/statCards.js';
+	import { requestGroups, retryKeys, genreDistribution, diversityTiles } from '$lib/statCards.js';
 	import {
 		chooseTimelineBucket,
 		timelineBucketName,
@@ -189,6 +189,16 @@
 			})
 		);
 	}
+	// '다시 시도': 그 카드의 요청이 그리는 카드 가운데 실패한 것만 한 번에 다시 부른다(statCards.js).
+	// loadAll 과 달리 drill-down 패널과 기간별 선곡 추이의 단위는 그대로 둔다.
+	const retry = (key) => load(retryKeys(key, errors));
+	// KPI 줄의 '다시 시도'는 누르면 줄째 사라지므로, 포커스를 다시 불러오는 칸들로 옮긴다.
+	function retryRow(key, row) {
+		row?.focus();
+		retry(key);
+	}
+	let summaryRow;
+	let tilesRow;
 	const loadAll = () => {
 		timelineBucket = nextTimelineBucket();
 		loadDrill();
@@ -441,7 +451,7 @@
 		<div class="empty-hint">지기를 선택하면 개인 통계를 볼 수 있습니다.</div>
 	{:else}
 		<!-- KPI 카드 -->
-		<div class="kpi-row">
+		<div class="kpi-row" bind:this={summaryRow} tabindex="-1">
 			<div class="kpi">
 				<div class="kpi-value">{summary ? summary.total_plays.toLocaleString() : '—'}</div>
 				<div class="kpi-label">총 선곡</div>
@@ -489,7 +499,16 @@
 			</div>
 		</div>
 		{#if errors.summary}
-			<p class="kpi-error">요약을 불러오지 못했습니다.</p>
+			<p class="kpi-error">
+				요약을 불러오지 못했습니다.
+				<button
+					class="tool-btn"
+					on:click={() => retryRow('summary', summaryRow)}
+					aria-label="요약 다시 시도"
+				>
+					다시 시도
+				</button>
+			</p>
 		{/if}
 
 		<!-- 차트 그리드 -->
@@ -500,6 +519,7 @@
 				data={composers}
 				loading={loading.composers}
 				error={errors.composers}
+				retry={() => retry('composers')}
 				{fileTag}
 				rowLabel="곡 보기"
 				on:itemclick={(e) => openBar('composers', e)}
@@ -513,6 +533,7 @@
 				data={soloists}
 				loading={loading.soloists}
 				error={errors.soloists}
+				retry={() => retry('soloists')}
 				{fileTag}
 				rowLabel="곡 보기"
 				on:itemclick={(e) => openBar('soloists', e)}
@@ -526,6 +547,7 @@
 				data={conductors}
 				loading={loading.conductors}
 				error={errors.conductors}
+				retry={() => retry('conductors')}
 				{fileTag}
 				rowLabel="곡 보기"
 				on:itemclick={(e) => openBar('conductors', e)}
@@ -539,6 +561,7 @@
 				data={orchestras}
 				loading={loading.orchestras}
 				error={errors.orchestras}
+				retry={() => retry('orchestras')}
 				{fileTag}
 				rowLabel="곡 보기"
 				on:itemclick={(e) => openBar('orchestras', e)}
@@ -552,6 +575,7 @@
 				data={eras}
 				loading={loading.eras}
 				error={errors.eras}
+				retry={() => retry('eras')}
 				{fileTag}
 				note={eraNote}
 				noteLink={{ href: '/stat/composers', text: '작곡가 정리' }}
@@ -564,6 +588,7 @@
 				data={genres}
 				loading={loading.genres}
 				error={errors.genres}
+				retry={() => retry('genres')}
 				{fileTag}
 				table={genres && shareTable(genres, '장르')}
 				csvHeaders={['장르', '횟수']}
@@ -574,6 +599,7 @@
 				data={timelineData}
 				loading={loading.timeline}
 				error={errors.timeline}
+				retry={() => retry('timeline')}
 				{fileTag}
 				links={timelineLinks}
 				on:itemclick={(e) => openBucket(timelineLinks, e)}
@@ -621,7 +647,7 @@
 			</div>
 		</div>
 
-		<div class="kpi-row diversity-kpi">
+		<div class="kpi-row diversity-kpi" bind:this={tilesRow} tabindex="-1">
 			<div class="kpi">
 				<div class="kpi-value">{tiles ? pct(groupEvenness(tiles.era)) : '—'}</div>
 				<div class="kpi-label">시대 다양성</div>
@@ -639,7 +665,16 @@
 		</div>
 		<!-- 칸의 '—'는 잴 것이 없을 때도 쓰므로, 불러오지 못했으면 따로 알린다 -->
 		{#if errors.diversityTiles}
-			<p class="kpi-error">선곡 다양성을 불러오지 못했습니다.</p>
+			<p class="kpi-error">
+				선곡 다양성을 불러오지 못했습니다.
+				<button
+					class="tool-btn"
+					on:click={() => retryRow('diversityTiles', tilesRow)}
+					aria-label="선곡 다양성 다시 시도"
+				>
+					다시 시도
+				</button>
+			</p>
 		{/if}
 
 		<div class="chart-grid">
@@ -649,6 +684,7 @@
 				data={countData}
 				loading={loading.diversity}
 				error={errors.diversity}
+				retry={() => retry('diversity')}
 				{fileTag}
 				links={diversityLinks}
 				on:itemclick={(e) => openBucket(diversityLinks, e)}
@@ -661,6 +697,7 @@
 				table={diversityTable}
 				loading={loading.diversity}
 				error={errors.diversity}
+				retry={() => retry('diversity')}
 				{fileTag}
 				links={diversityLinks}
 				on:itemclick={(e) => openBucket(diversityLinks, e)}
@@ -757,6 +794,21 @@
 		font-family: var(--small-medium-font-family, 'Noto Sans KR', sans-serif);
 		font-size: var(--small-medium-font-size, 13px);
 		color: var(--secondary-secondary-800, #95560d);
+	}
+	/* 카드(ChartCard)의 단추와 같은 모양 */
+	.tool-btn {
+		margin-left: 8px;
+		font-family: var(--small-medium-font-family, 'Noto Sans KR', sans-serif);
+		font-size: var(--small-medium-font-size, 13px);
+		color: var(--primary-primary-800, #6a5134);
+		background: var(--secondary-secondary-100, #fef9f3);
+		border: 1px solid var(--primary-primary-600, #c8ad8f);
+		border-radius: 4px;
+		padding: 3px 8px;
+		cursor: pointer;
+	}
+	.tool-btn:hover {
+		background: var(--secondary-secondary-200, #fdf1e4);
 	}
 	.drill-hint {
 		margin: 8px 0 0;
