@@ -616,7 +616,9 @@
 					{scopeLabel}
 					historyLink={drillHistoryLink}
 					workLink={drillWorkLink}
-					composerLink={drill.card === 'composers' ? composerHref(drill.id) : ''}
+					composerLink={drill.card === 'composers'
+						? composerHref(drill.id, { period, start: customStart, end: customEnd })
+						: ''}
 					on:close={closeDrill}
 				/>
 			{/key}
