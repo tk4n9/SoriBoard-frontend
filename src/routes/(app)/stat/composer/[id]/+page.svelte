@@ -5,7 +5,7 @@
 	import DataTable from '$lib/components/stat/DataTable.svelte';
 	import PeriodSelect from '$lib/components/stat/PeriodSelect.svelte';
 	import { horizontalBarOption, countBarOption } from '$lib/chartOptions.js';
-	import { rankTable } from '$lib/statTable.js';
+	import { rankTable, placeholderText } from '$lib/statTable.js';
 	import { WORKS_LIMIT, barItemIndex } from '$lib/statDrill.js';
 	import { pageTitle } from '$lib/statTitle.js';
 	import { ALL, CURRENT, CUSTOM, periodRangeText, currentSemesterRange } from '$lib/statPeriod.js';
@@ -291,12 +291,11 @@
 				/>
 				<!-- 곡은 처음·마지막 날짜까지 보이도록 차트 없이 표로만 -->
 				<section class="card" aria-label="많이 튼 곡">
-					{#if loading.works}
-						<div class="placeholder">불러오는 중...</div>
-					{:else if errors.works}
-						<div class="placeholder error">많이 튼 곡 — {errors.works}</div>
-					{:else if !worksTable}
-						<div class="placeholder">데이터가 없습니다</div>
+					{#if loading.works || errors.works || !worksTable}
+						<!-- 표가 없으면 제목도 없으므로, 차트 카드처럼 어느 카드인지 여기서 밝힌다. -->
+						<div class="placeholder" class:error={!loading.works && errors.works}>
+							{placeholderText('많이 튼 곡', { loading: loading.works, error: errors.works })}
+						</div>
 					{:else}
 						<DataTable
 							table={worksTable}
