@@ -4,7 +4,8 @@ import {
 	requestGroups,
 	genreDistribution,
 	diversityTiles,
-	DERIVED_CARDS
+	DERIVED_CARDS,
+	retryKeys
 } from '../../src/lib/statCards.js';
 
 test('the genre card is drawn from the diversity answer', () => {
@@ -102,4 +103,37 @@ test('diversityTiles takes the summary, which does not depend on the bucket', ()
 	});
 	assert.equal(diversityTiles(answer('week')), summary);
 	assert.deepEqual(diversityTiles(answer('week')), diversityTiles(answer('month')));
+});
+
+test('retryKeys: a card with its own request retries only itself', () => {
+	const errors = { eras: '불러오지 못했습니다', composers: '불러오지 못했습니다' };
+	assert.deepEqual(retryKeys('eras', errors), ['eras']);
+});
+
+test('retryKeys: the genre card retries every failed card of the diversity request', () => {
+	const errors = {
+		diversity: '불러오지 못했습니다',
+		genres: '불러오지 못했습니다',
+		diversityTiles: '불러오지 못했습니다',
+		eras: '불러오지 못했습니다'
+	};
+	const keys = retryKeys('genres', errors);
+	assert.deepEqual(keys, ['diversity', 'genres', 'diversityTiles']);
+	// one fetch for all three
+	assert.deepEqual(requestGroups(keys), [['diversity', keys]]);
+	assert.deepEqual(retryKeys('diversity', errors), keys);
+	assert.deepEqual(retryKeys('diversityTiles', errors), keys);
+});
+
+test('retryKeys: when only the genre card failed, it retries the genre card alone', () => {
+	assert.deepEqual(retryKeys('genres', { diversity: '', genres: '불러오지 못했습니다' }), [
+		'genres'
+	]);
+});
+
+test('retryKeys never includes a card without an error', () => {
+	const errors = { diversity: '', genres: '불러오지 못했습니다', diversityTiles: '' };
+	assert.deepEqual(retryKeys('diversity', errors), ['genres']);
+	assert.deepEqual(retryKeys('eras', errors), []);
+	assert.deepEqual(retryKeys('summary', {}), []);
 });

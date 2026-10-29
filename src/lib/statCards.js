@@ -24,6 +24,21 @@ export function requestGroups(keys, derived = DERIVED_CARDS) {
 	return [...groups];
 }
 
+// '다시 시도'로 다시 불러올 카드: card 를 그리는 요청이 그리는 카드 가운데 실패한 것(한 번의 요청으로).
+// 다양성 요청이 실패했으면 장르별 분포의 단추가 선곡 수·다양성 추이 카드와 선곡 다양성의 칸도 함께 불러온다.
+// 불러온 카드는 건드리지 않는다.
+/**
+ * @param {string} card
+ * @param {Record<string, string>} errors
+ * @param {Record<string, string>} [derived]
+ * @returns {string[]}
+ */
+export function retryKeys(card, errors, derived = DERIVED_CARDS) {
+	const request = derived[card] ?? card;
+	const cards = [request, ...Object.keys(derived).filter((key) => derived[key] === request)];
+	return cards.filter((key) => errors[key]);
+}
+
 // 다양성 응답 → 장르별 분포 카드의 봉투({ filters, total_plays, labels, values }).
 // summary 는 주별/월별 버킷과 무관하다. summary.genre 에는 총계가 없어 응답의 total_plays 를 쓴다.
 /** @param {any} diversity */
