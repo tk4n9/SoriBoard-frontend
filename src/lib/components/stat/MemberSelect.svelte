@@ -15,7 +15,8 @@
 	// 목록을 못 받으면 알림창 대신 select 아래에 짧게 적는다.
 	let listError = '';
 
-	onMount(async () => {
+	// 지기 목록을 부른다(처음, 그리고 '다시 시도'). 받았는지를 돌려준다.
+	async function loadList() {
 		try {
 			const res = await fetch('/api/user/');
 			if (!res.ok) throw new Error(`Failed to fetch users: ${res.status}`);
@@ -23,7 +24,7 @@
 		} catch (e) {
 			console.error('지기 목록을 불러오지 못했습니다.', e);
 			listError = '지기 목록을 불러오지 못했습니다.';
-			return;
+			return false;
 		}
 		// 링크의 지기가 목록에 없으면 지기를 고르지 않은 것으로 되돌린다(목록을 못 받으면 그대로 둔다).
 		const known = knownUser(userId, users);
@@ -31,7 +32,24 @@
 			userId = known;
 			dispatch('change', { userId, includeMentees });
 		}
-	});
+		return true;
+	}
+
+	onMount(loadList);
+
+	// 지기 목록의 '다시 시도': PeriodSelect 의 학기 목록과 같다(aria-disabled, 받으면 select 로 포커스).
+	let retrying = false;
+	async function retryList(e) {
+		if (retrying) return;
+		const button = e.currentTarget;
+		retrying = true;
+		listError = '';
+		const loaded = await loadList();
+		retrying = false;
+		// select 에 bind:this 를 걸면 목록이 와도 링크의 값을 다시 고르지 않으므로(Svelte 4) 단추에서 찾는다.
+		if (loaded && document.activeElement === button)
+			button.closest('.member-select')?.querySelector('select')?.focus();
+	}
 
 	$: userName = users.find((user) => String(user.id) === String(userId))?.name ?? '';
 
@@ -62,7 +80,19 @@
 		<input type="checkbox" checked={includeMentees} on:change={onMenteeChange} />
 		견습 포함
 	</label>
-	<p id={errorId} class="list-error" aria-live="polite">{listError}</p>
+	<div class="list-note">
+		<p id={errorId} class="list-error" aria-live="polite">{listError}</p>
+		{#if listError || retrying}
+			<button
+				class="tool-btn"
+				on:click={retryList}
+				aria-label="지기 목록 다시 시도"
+				aria-disabled={retrying ? 'true' : undefined}
+			>
+				다시 시도
+			</button>
+		{/if}
+	</div>
 </div>
 
 <style>
@@ -108,7 +138,7 @@
 		cursor: pointer;
 	}
 	/* PeriodSelect 의 범위 문구처럼 머리말 아래 여백에 띄워, 머리말 높이가 바뀌지 않게 한다. */
-	.list-error {
+	.list-note {
 		position: absolute;
 		top: 100%;
 		left: 0;
@@ -117,5 +147,36 @@
 		font-family: var(--small-medium-font-family, 'Noto Sans KR', sans-serif);
 		font-size: var(--small-medium-font-size, 13px);
 		color: var(--danger-fg);
+		display: flex;
+		align-items: center;
+		gap: 6px;
+	}
+	/* 줄의 마지막 컨트롤이면(통계의 개인 보기) 오른쪽 끝에 맞춰 왼쪽으로 펼쳐, 화면 밖으로 넘치지 않게 한다. */
+	.member-select:last-child .list-note {
+		left: auto;
+		right: 0;
+	}
+	.list-error {
+		margin: 0;
+	}
+	/* PeriodSelect 의 '다시 시도'와 같은 모양. */
+	.tool-btn {
+		font-family: var(--small-medium-font-family, 'Noto Sans KR', sans-serif);
+		font-size: var(--small-medium-font-size, 13px);
+		color: var(--primary-primary-800, #6a5134);
+		background: var(--secondary-secondary-100, #fef9f3);
+		border: 1px solid var(--primary-primary-600, #c8ad8f);
+		border-radius: 4px;
+		padding: 0 6px;
+		cursor: pointer;
+	}
+	.tool-btn:hover:not([aria-disabled='true']) {
+		background: var(--secondary-secondary-200, #fdf1e4);
+	}
+	.tool-btn[aria-disabled='true'] {
+		color: var(--gray-gray-500);
+		border-color: var(--gray-gray-400);
+		background: var(--secondary-secondary-50);
+		cursor: default;
 	}
 </style>

@@ -27,7 +27,8 @@
 	let draftStart = start;
 	let draftEnd = end;
 
-	onMount(async () => {
+	// 학기 목록을 부른다(처음, 그리고 '다시 시도'). 받았는지를 돌려준다.
+	async function loadList() {
 		let loaded = false;
 		try {
 			const res = await fetch('/api/semester');
@@ -44,7 +45,26 @@
 			period = known;
 			dispatch('change', period);
 		}
-	});
+		return loaded;
+	}
+
+	onMount(loadList);
+
+	// 학기 목록의 '다시 시도': 부르는 동안 단추는 자리에 두고(aria-disabled) 누름만 무시한다.
+	// disabled 로 끄면 포커스가 본문으로 떨어진다. 문구는 비워 두어, 또 실패하면 다시 읽히게 한다.
+	// 받으면 단추가 사라지므로, 포커스가 단추에 있었으면 select 로 옮긴다.
+	let retrying = false;
+	async function retryList(e) {
+		if (retrying) return;
+		const button = e.currentTarget;
+		retrying = true;
+		listError = '';
+		const loaded = await loadList();
+		retrying = false;
+		// select 에 bind:this 를 걸면 목록이 와도 링크의 값을 다시 고르지 않으므로(Svelte 4) 단추에서 찾는다.
+		if (loaded && document.activeElement === button)
+			button.closest('.period-select')?.querySelector('select')?.focus();
+	}
 
 	function onChange(e) {
 		period = e.target.value;
@@ -103,7 +123,19 @@
 			<p id={errorId} class="range-error" aria-live="polite">{error}</p>
 		</form>
 	{/if}
-	<p id={listErrorId} class="list-error" aria-live="polite">{listNote}</p>
+	<div class="list-note">
+		<p id={listErrorId} class="list-error" aria-live="polite">{listNote}</p>
+		{#if period !== CUSTOM && (listError || retrying)}
+			<button
+				class="tool-btn"
+				on:click={retryList}
+				aria-label="학기 목록 다시 시도"
+				aria-disabled={retrying ? 'true' : undefined}
+			>
+				다시 시도
+			</button>
+		{/if}
+	</div>
 </div>
 
 <style>
@@ -150,7 +182,7 @@
 	}
 	/* 머리말 아래 여백에 띄워, 문구가 생겨도 머리말 높이가 바뀌지 않게 한다. */
 	.range-error,
-	.list-error {
+	.list-note {
 		position: absolute;
 		top: 100%;
 		left: 0;
@@ -161,8 +193,34 @@
 		color: var(--danger-fg);
 	}
 	/* select 의 오른쪽 끝에 맞춰 왼쪽으로 펼친다: 바로 오른쪽 지기 select 의 문구와 겹치지 않게. */
-	.list-error {
+	.list-note {
 		left: auto;
 		right: 0;
+		display: flex;
+		align-items: center;
+		gap: 6px;
+	}
+	.list-error {
+		margin: 0;
+	}
+	/* 다른 통계 화면의 tool-btn 과 같은 모양. 머리말 아래 여백에 들어가도록 위아래 여백은 뺐다. */
+	.tool-btn {
+		font-family: var(--small-medium-font-family, 'Noto Sans KR', sans-serif);
+		font-size: var(--small-medium-font-size, 13px);
+		color: var(--primary-primary-800, #6a5134);
+		background: var(--secondary-secondary-100, #fef9f3);
+		border: 1px solid var(--primary-primary-600, #c8ad8f);
+		border-radius: 4px;
+		padding: 0 6px;
+		cursor: pointer;
+	}
+	.tool-btn:hover:not([aria-disabled='true']) {
+		background: var(--secondary-secondary-200, #fdf1e4);
+	}
+	.tool-btn[aria-disabled='true'] {
+		color: var(--gray-gray-500);
+		border-color: var(--gray-gray-400);
+		background: var(--secondary-secondary-50);
+		cursor: default;
 	}
 </style>
