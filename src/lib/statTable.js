@@ -95,6 +95,17 @@ export function shareTable({ labels, values }, nameHeader) {
 	};
 }
 
+// 시대별 분포 카드의 경고: 시대 미상이 20%를 넘으면 그 비율을 알린다. 비율은 같은 카드의 표
+// (shareTable)의 '미상' 칸과 같은 수(최대 잔여 방식, 소수 한 자리)로 쓴다. '미상'이 라벨에 없으면
+// 백엔드의 unknown_share 를 그대로 쓴다.
+/** @param {{ labels: string[], values: number[], unknown_share: number } | null | undefined} eras */
+export function unknownEraNote(eras) {
+	if (!eras || !(eras.unknown_share > 0.2)) return '';
+	const i = eras.labels.indexOf('미상');
+	const share = i >= 0 ? sharePercents(eras.values, SHARE_PRECISION)[i] : eras.unknown_share * 100;
+	return `시대 미상 비율 ${formatShare(share)} — 일부 작곡가 데이터 미반영`;
+}
+
 // 시계열(선곡 추이·선곡 수·다양성 추이): 기간과 계열마다 한 칸.
 /**
  * @param {string[]} labels

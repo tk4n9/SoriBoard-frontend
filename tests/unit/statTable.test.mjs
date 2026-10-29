@@ -11,7 +11,8 @@ import {
 	formatEvenness,
 	groupEvenness,
 	chartLabel,
-	placeholderText
+	placeholderText,
+	unknownEraNote
 } from '../../src/lib/statTable.js';
 
 test('equal counts share a rank and the next rank skips', () => {
@@ -73,6 +74,44 @@ test('share tables give one fixed decimal, so equal counts read the same', () =>
 	);
 	assert.equal(formatShare(16), '16.0%');
 	assert.equal(formatShare(22.6), '22.6%');
+});
+
+// The 미상 cell of the era card's table (shareTable), for the note to match.
+const unknownCell = (eras) => shareTable(eras, '시대').rows.find((row) => row[0] === '미상')[2];
+
+test('the 시대 미상 note gives the share as the table does, with one decimal', () => {
+	// 201 plays, 47 미상: the backend's unknown_share is round(47 / 201, 4).
+	const eras = {
+		labels: ['중세', '바로크', '고전', '낭만', '미상'],
+		values: [40, 50, 45, 19, 47],
+		unknown_share: 0.2338
+	};
+	assert.equal(unknownEraNote(eras), '시대 미상 비율 23.4% — 일부 작곡가 데이터 미반영');
+	assert.equal(unknownCell(eras), '23.4%');
+});
+
+test('the 시대 미상 note follows the table when the pie rounding moves 미상', () => {
+	// 3 / 7 = 42.857…%, but the largest remainders go to the other slices: the table reads 42.8%.
+	const eras = {
+		labels: ['바로크', '고전', '낭만', '미상'],
+		values: [1, 1, 2, 3],
+		unknown_share: 0.4286
+	};
+	assert.equal(unknownCell(eras), '42.8%');
+	assert.equal(unknownEraNote(eras), '시대 미상 비율 42.8% — 일부 작곡가 데이터 미반영');
+});
+
+test('there is no 시대 미상 note at 20% or less, or without an answer', () => {
+	const eras = { labels: ['낭만', '미상'], values: [4, 1], unknown_share: 0.2 };
+	assert.equal(unknownEraNote(eras), '');
+	assert.equal(unknownEraNote({ labels: ['낭만'], values: [5], unknown_share: 0 }), '');
+	assert.equal(unknownEraNote(null), '');
+	assert.equal(unknownEraNote(undefined), '');
+});
+
+test('without a 미상 label, the 시대 미상 note uses unknown_share', () => {
+	const eras = { labels: ['바로크', '낭만'], values: [3, 1], unknown_share: 0.2338 };
+	assert.equal(unknownEraNote(eras), '시대 미상 비율 23.4% — 일부 작곡가 데이터 미반영');
 });
 
 test('a series table has one column per series, each with its own format', () => {

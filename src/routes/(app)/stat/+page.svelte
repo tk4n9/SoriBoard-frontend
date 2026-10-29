@@ -30,7 +30,8 @@
 		shareTable,
 		seriesTable,
 		formatEvenness,
-		groupEvenness
+		groupEvenness,
+		unknownEraNote
 	} from '$lib/statTable.js';
 	import { seriesCsv } from '$lib/csvTable.js';
 	import {
@@ -342,10 +343,7 @@
 	$: timelineData = timeline && timelineView(timeline);
 	$: timelineOpt = timelineData && timelineOption(timelineData, timelineTitle, scopeLabel);
 	$: eraOpt = eras && eraPieOption(eras, '시대별 분포', subtitleFor(eras));
-	$: eraNote =
-		eras && eras.unknown_share > 0.2
-			? `시대 미상 비율 ${Math.round(eras.unknown_share * 100)}% — 일부 작곡가 데이터 미반영`
-			: '';
+	$: eraNote = unknownEraNote(eras);
 	$: genreOpt = genres && eraPieOption(genres, '장르별 분포', subtitleFor(genres));
 
 	// 다양성: 버킷 라벨, 선곡 수 막대, 다양성(고른정도) 추이.
