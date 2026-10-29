@@ -1,5 +1,5 @@
 <script>
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import EChart from '$lib/components/stat/EChart.svelte';
@@ -90,25 +90,38 @@
 	// 다른 학기로 바꾸면 이전 학기의 늦은 응답은 버린다.
 	let generation = 0;
 
+	function loadCard(key, gen) {
+		cardRequests[key]()
+			.then((result) => {
+				if (gen === generation) data[key] = result;
+			})
+			.catch((e) => {
+				if (gen !== generation) return;
+				console.error(`학기 결산 로딩 실패 (${key})`, e);
+				errors[key] = '불러오지 못했습니다';
+			})
+			.finally(() => {
+				if (gen === generation) loading[key] = false;
+			});
+	}
+
 	function loadAll() {
 		const gen = ++generation;
 		data = {};
 		errors = {};
 		loading = Object.fromEntries(CARD_KEYS.map((key) => [key, true]));
-		for (const key of CARD_KEYS) {
-			cardRequests[key]()
-				.then((result) => {
-					if (gen === generation) data[key] = result;
-				})
-				.catch((e) => {
-					if (gen !== generation) return;
-					console.error(`학기 결산 로딩 실패 (${key})`, e);
-					errors[key] = '불러오지 못했습니다';
-				})
-				.finally(() => {
-					if (gen === generation) loading[key] = false;
-				});
-		}
+		for (const key of CARD_KEYS) loadCard(key, gen);
+	}
+
+	// '다시 시도': 그 카드만 다시 부른다. generation 은 그대로 두어 다른 카드의 요청을 살리고,
+	// 그 사이 학기를 바꾸면(loadAll) 이 요청의 늦은 응답도 버린다.
+	// 단추는 사라지므로, 단추에 있던 포커스는 먼저 target(카드의 section, 요약은 KPI 줄)으로 옮긴다.
+	let kpiRow;
+	function retry(key, e, target) {
+		if (document.activeElement === e.currentTarget) target?.focus();
+		loading[key] = true;
+		errors[key] = '';
+		loadCard(key, generation);
 	}
 
 	function choose(next) {
@@ -117,7 +130,7 @@
 		loadAll();
 	}
 
-	onMount(async () => {
+	async function loadSemesters() {
 		try {
 			const res = await fetch('/api/semester');
 			if (!res.ok) throw new Error(`semester ${res.status}`);
@@ -134,7 +147,27 @@
 			goto(reportHref(null), { replaceState: true, keepFocus: true, noScroll: true });
 		}
 		choose(picked);
-	});
+	}
+
+	onMount(loadSemesters);
+
+	// 학기 목록의 '다시 시도': 다시 부르는 동안 포커스는 안내 문구(semestersHint)에 두고,
+	// 학기를 고르면 학기 select 로 옮긴다(불러오기 전에는 select 가 꺼져 있어 포커스를 받지 못한다).
+	let semestersHint;
+	let semesterSelect;
+	let semestersRetrying = false;
+	async function retrySemesters(e) {
+		const hadFocus = document.activeElement === e.currentTarget;
+		if (hadFocus) semestersHint?.focus();
+		semestersError = '';
+		semestersLoaded = false;
+		semestersRetrying = true;
+		await loadSemesters();
+		semestersRetrying = false;
+		if (!hadFocus || !semester) return;
+		await tick();
+		semesterSelect?.focus();
+	}
 
 	function onSelect(e) {
 		const next = semesters.find((s) => String(s.id) === e.currentTarget.value);
@@ -280,6 +313,7 @@
 			{/if}
 			<select
 				aria-label="학기"
+				bind:this={semesterSelect}
 				value={semester ? String(semester.id) : ''}
 				on:change={onSelect}
 				disabled={!semester}
@@ -292,12 +326,21 @@
 		</div>
 	</header>
 
-	{#if semestersError}
-		<div class="empty-hint error">{semestersError}</div>
+	{#if semestersError || semestersRetrying}
+		<div class="empty-hint" class:error={semestersError} tabindex="-1" bind:this={semestersHint}>
+			{#if semestersError}
+				{semestersError}
+				<button class="tool-btn" on:click={retrySemesters} aria-label="학기 목록 다시 시도">
+					다시 시도
+				</button>
+			{:else}
+				불러오는 중...
+			{/if}
+		</div>
 	{:else if semestersLoaded && !semester}
 		<div class="empty-hint">학기가 없습니다.</div>
 	{:else if semester}
-		<div class="kpi-row">
+		<div class="kpi-row" tabindex="-1" bind:this={kpiRow}>
 			{#each KPIS as [key, name]}
 				<div class="kpi">
 					<div class="kpi-value">{count(summary?.[key])}</div>
@@ -306,7 +349,16 @@
 			{/each}
 		</div>
 		{#if errors.summary}
-			<p class="kpi-error">요약을 불러오지 못했습니다.</p>
+			<p class="kpi-error">
+				요약을 불러오지 못했습니다.
+				<button
+					class="tool-btn"
+					on:click={(e) => retry('summary', e, kpiRow)}
+					aria-label="요약 다시 시도"
+				>
+					다시 시도
+				</button>
+			</p>
 		{/if}
 
 		{#if empty}
@@ -314,13 +366,27 @@
 		{:else}
 			<div class="grid">
 				{#each topCards as card}
-					<section class="card" class:wide={card.wide} aria-labelledby={`report-${card.key}`}>
+					<section
+						class="card"
+						class:wide={card.wide}
+						tabindex="-1"
+						aria-labelledby={`report-${card.key}`}
+					>
 						<h2 id={`report-${card.key}`}>{card.title}</h2>
 						<p class="subtitle">상위 10 · {total(data[card.key])}</p>
 						{#if loading[card.key]}
 							<div class="placeholder">불러오는 중...</div>
 						{:else if errors[card.key]}
-							<div class="placeholder error">{card.title} — {errors[card.key]}</div>
+							<div class="placeholder error">
+								{card.title} — {errors[card.key]}
+								<button
+									class="tool-btn"
+									on:click={(e) => retry(card.key, e, e.currentTarget.closest('section'))}
+									aria-label={`${card.title} 다시 시도`}
+								>
+									다시 시도
+								</button>
+							</div>
 						{:else if !card.table}
 							<div class="placeholder">데이터가 없습니다</div>
 						{:else}
@@ -334,13 +400,22 @@
 				{/each}
 
 				{#each mixCards as card}
-					<section class="card wide" aria-labelledby={`report-${card.key}`}>
+					<section class="card wide" tabindex="-1" aria-labelledby={`report-${card.key}`}>
 						<h2 id={`report-${card.key}`}>{card.title}</h2>
 						<p class="subtitle">{card.subtitle}</p>
 						{#if loading[card.key]}
 							<div class="placeholder">불러오는 중...</div>
 						{:else if errors[card.key]}
-							<div class="placeholder error">{card.title} — {errors[card.key]}</div>
+							<div class="placeholder error">
+								{card.title} — {errors[card.key]}
+								<button
+									class="tool-btn"
+									on:click={(e) => retry(card.key, e, e.currentTarget.closest('section'))}
+									aria-label={`${card.title} 다시 시도`}
+								>
+									다시 시도
+								</button>
+							</div>
 						{:else if !card.table}
 							<div class="placeholder">데이터가 없습니다</div>
 						{:else}
@@ -358,13 +433,22 @@
 				{/each}
 
 				{#each firstsCards as card}
-					<section class="card wide breakable" aria-labelledby={`report-${card.key}`}>
+					<section class="card wide breakable" tabindex="-1" aria-labelledby={`report-${card.key}`}>
 						<h2 id={`report-${card.key}`}>{card.title}</h2>
 						<p class="subtitle">{card.subtitle}</p>
 						{#if loading[card.key]}
 							<div class="placeholder">불러오는 중...</div>
 						{:else if errors[card.key]}
-							<div class="placeholder error">{card.title} — {errors[card.key]}</div>
+							<div class="placeholder error">
+								{card.title} — {errors[card.key]}
+								<button
+									class="tool-btn"
+									on:click={(e) => retry(card.key, e, e.currentTarget.closest('section'))}
+									aria-label={`${card.title} 다시 시도`}
+								>
+									다시 시도
+								</button>
+							</div>
 						{:else if !card.table}
 							<div class="placeholder">없습니다</div>
 						{:else}
@@ -465,6 +549,24 @@
 	.kpi-error {
 		color: var(--secondary-secondary-800, #95560d);
 	}
+	/* 다른 통계 페이지(SpellingVariants.svelte)의 단추와 같은 모양 */
+	.tool-btn {
+		font-family: var(--small-medium-font-family, 'Noto Sans KR', sans-serif);
+		font-size: var(--small-medium-font-size, 13px);
+		color: var(--primary-primary-800, #6a5134);
+		background: var(--secondary-secondary-100, #fef9f3);
+		border: 1px solid var(--primary-primary-600, #c8ad8f);
+		border-radius: 4px;
+		padding: 4px 12px;
+		cursor: pointer;
+	}
+	.tool-btn:hover {
+		background: var(--secondary-secondary-200, #fdf1e4);
+	}
+	.empty-hint .tool-btn,
+	.kpi-error .tool-btn {
+		margin-left: 8px;
+	}
 	.kpi-row {
 		display: grid;
 		grid-template-columns: repeat(7, 1fr);
@@ -531,6 +633,8 @@
 	}
 	.placeholder {
 		display: flex;
+		flex-direction: column;
+		gap: 10px;
 		align-items: center;
 		justify-content: center;
 		height: 120px;
@@ -575,7 +679,8 @@
 		.report-page {
 			padding: 0;
 		}
-		.controls {
+		.controls,
+		.tool-btn {
 			display: none;
 		}
 		.card {
