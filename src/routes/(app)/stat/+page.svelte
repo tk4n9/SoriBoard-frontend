@@ -54,7 +54,7 @@
 	} from '$lib/statPeriod.js';
 	import { historyHref, drillWorkTargets, bucketHistoryLinks } from '$lib/playHistory.js';
 	import { composerHref } from '$lib/composerStats.js';
-	import { reportHref, previousSemester, kpiChangeText } from '$lib/semesterReport.js';
+	import { reportHref, previousSemester, kpiChangeText, mixTable } from '$lib/semesterReport.js';
 	import { memberFileText } from '$lib/statFileName.js';
 	import { pageTitle, periodTitle } from '$lib/statTitle.js';
 
@@ -220,7 +220,10 @@
 
 	// 기간이 목록의 학기면 KPI 칸 아래에 바로 앞 학기와 견준 줄을 둔다(학기 결산과 같다).
 	// 앞 학기의 요약은 같은 범위·지기·견습 포함으로 요약과 함께 부르고, 실패하면 줄만 없다.
+	// 시대·장르의 표도 앞 학기의 비율과 견준다(학기 결산의 mixTable). 실패하면 그 표만 지금과 같다.
 	let previousSummary = null;
+	let previousEras = null;
+	let previousGenres = null;
 	let previousAsked = null; // 마지막으로 부른 앞 학기 id(없으면 null)
 	const previousOf = (p, list) => {
 		const chosen = list.find((s) => String(s.id) === p);
@@ -231,14 +234,25 @@
 		const previous = previousOf(period, semesters);
 		previousAsked = previous?.id ?? null;
 		previousSummary = null;
+		previousEras = null;
+		previousGenres = null;
 		if (!previous || (scope === 'individual' && !userId)) return;
-		try {
-			// buildQuery 는 extra 를 마지막에 넣으므로 기간의 semester_id 만 바뀌고 지기는 그대로다.
-			const result = await getJson('summary', { semester_id: String(previous.id) });
-			if (requests.isLatest('previousSummary', id)) previousSummary = result;
-		} catch (e) {
-			if (requests.isLatest('previousSummary', id)) console.error('통계 로딩 실패 (지난 학기)', e);
-		}
+		const ask = async (endpoint, apply) => {
+			try {
+				// buildQuery 는 extra 를 마지막에 넣으므로 기간의 semester_id 만 바뀌고 지기는 그대로다.
+				const result = await getJson(endpoint, { semester_id: String(previous.id) });
+				if (requests.isLatest('previousSummary', id)) apply(result);
+			} catch (e) {
+				if (requests.isLatest('previousSummary', id))
+					console.error(`통계 로딩 실패 (지난 학기 ${endpoint})`, e);
+			}
+		};
+		// 장르 카드는 다양성 응답에서 그리지만, 앞 학기는 같은 분류를 세는 stats/genres 로 가볍게 부른다.
+		await Promise.allSettled([
+			ask('summary', (result) => (previousSummary = result)),
+			ask('eras', (result) => (previousEras = result)),
+			ask('genres', (result) => (previousGenres = result))
+		]);
 	}
 	// 링크로 연 학기는 학기 목록이 온 뒤에야 앞 학기를 안다. 기간·범위가 바뀔 때는 load 가 이미
 	// 불렀으므로, 앞 학기가 마지막으로 부른 것과 다를 때만 부른다.
@@ -706,7 +720,8 @@
 				{fileTag}
 				note={eraNote}
 				noteLink={{ href: '/stat/composers', text: '작곡가 정리' }}
-				table={eras && shareTable(eras, '시대')}
+				table={eras &&
+					(previousEras ? mixTable(eras, previousEras, '시대') : shareTable(eras, '시대'))}
 				csvHeaders={['시대', '횟수']}
 			/>
 			<ChartCard
@@ -717,7 +732,8 @@
 				error={errors.genres}
 				retry={() => retry('genres')}
 				{fileTag}
-				table={genres && shareTable(genres, '장르')}
+				table={genres &&
+					(previousGenres ? mixTable(genres, previousGenres, '장르') : shareTable(genres, '장르'))}
 				csvHeaders={['장르', '횟수']}
 			/>
 			<ChartCard
