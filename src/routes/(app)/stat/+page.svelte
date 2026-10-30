@@ -641,7 +641,13 @@
 					historyLink={drillHistoryLink}
 					workLink={drillWorkLink}
 					composerLink={drill.card === 'composers'
-						? composerHref(drill.id, { period, start: customStart, end: customEnd })
+						? composerHref(drill.id, {
+								period,
+								start: customStart,
+								end: customEnd,
+								userId: scope === 'individual' ? userId : null,
+								includeMentees
+							})
 						: ''}
 					on:close={closeDrill}
 				/>

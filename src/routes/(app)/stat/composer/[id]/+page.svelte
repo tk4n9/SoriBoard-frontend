@@ -4,17 +4,22 @@
 	import ChartCard from '$lib/components/stat/ChartCard.svelte';
 	import DataTable from '$lib/components/stat/DataTable.svelte';
 	import PeriodSelect from '$lib/components/stat/PeriodSelect.svelte';
+	import MemberSelect from '$lib/components/stat/MemberSelect.svelte';
 	import { horizontalBarOption, countBarOption } from '$lib/chartOptions.js';
 	import { rankTable, placeholderText } from '$lib/statTable.js';
 	import { WORKS_LIMIT, barItemIndex } from '$lib/statDrill.js';
 	import { pageTitle } from '$lib/statTitle.js';
+	import { memberFileText } from '$lib/statFileName.js';
 	import { ALL, CURRENT, CUSTOM, periodRangeText, currentSemesterRange } from '$lib/statPeriod.js';
 	import { semesterRangeOf } from '$lib/statBucket.js';
 	import {
 		readComposerId,
 		readComposerPeriod,
 		writeComposerPeriod,
+		readComposerMember,
+		writeComposerMember,
 		composerPeriodParams,
+		composerMemberParams,
 		composerPeriodName,
 		composerStatHref,
 		composerWorkHref,
@@ -26,12 +31,14 @@
 		composerWorksTable
 	} from '$lib/composerStats.js';
 
-	// 작곡가 한 명의 기록, 고른 기간만(기본값은 전체 기간). 카드는 따로 불러오고, 실패하면 그 카드에만 오류를 띄운다.
+	// 작곡가 한 명의 기록, 고른 기간·지기만(기본값은 전체 기간·전체 지기). 카드는 따로 불러오고,
+	// 실패하면 그 카드에만 오류를 띄운다.
 	$: composerId = readComposerId($page.params.id);
 
-	// 기간은 URL에도 둔다(composerStats.js). 처음 열 때와 다른 작곡가로 옮겨 갈 때 URL에서 읽는다.
+	// 기간과 지기는 URL에도 둔다(composerStats.js). 처음 열 때와 다른 작곡가로 옮겨 갈 때 URL에서 읽는다.
 	let { period, start: customStart, end: customEnd } = readComposerPeriod($page.url.searchParams);
-	$: filter = { period, start: customStart, end: customEnd };
+	let { userId, includeMentees } = readComposerMember($page.url.searchParams);
+	$: filter = { period, start: customStart, end: customEnd, userId, includeMentees };
 	// 이번 학기 = 가장 최근 학기의 시작일부터 오늘까지(통계와 같다).
 	const current = currentSemesterRange();
 
@@ -39,6 +46,7 @@
 		const params = new URLSearchParams({
 			composer_id: id,
 			...composerPeriodParams({ period, start: customStart, end: customEnd }, current),
+			...composerMemberParams({ userId, includeMentees }),
 			...extra
 		});
 		const res = await fetch(`/api/stats/${endpoint}?${params}`);
@@ -107,7 +115,7 @@
 			});
 	}
 
-	// 카드만 다시 부른다(기간이 바뀌면 작곡가 정보는 그대로다).
+	// 카드만 다시 부른다(기간이나 지기가 바뀌면 작곡가 정보는 그대로다).
 	function loadCards() {
 		const id = readComposerId($page.params.id);
 		const gen = ++cardGeneration;
@@ -144,13 +152,14 @@
 		if (id) loadComposer(id, gen);
 		loadCards();
 	}
-	// 처음 열 때와, 같은 페이지에서 다른 작곡가로 옮겨 갈 때: 기간도 URL에서 다시 읽는다.
-	// 기간을 바꿔 이 페이지가 URL을 고친 goto 는 건너뛴다(onPeriodChange 가 이미 불러왔다).
+	// 처음 열 때와, 같은 페이지에서 다른 작곡가로 옮겨 갈 때: 기간·지기도 URL에서 다시 읽는다.
+	// 기간이나 지기를 바꿔 이 페이지가 URL을 고친 goto 는 건너뛴다(onPeriodChange·onMemberChange 가 이미 불러왔다).
 	afterNavigate((navigation) => {
 		if (navigation.type === 'goto' && navigation.from?.params?.id === navigation.to?.params?.id) {
 			return;
 		}
 		({ period, start: customStart, end: customEnd } = readComposerPeriod($page.url.searchParams));
+		({ userId, includeMentees } = readComposerMember($page.url.searchParams));
 		loadAll();
 	});
 
@@ -161,6 +170,15 @@
 		goto(url, { replaceState: true, keepFocus: true, noScroll: true });
 		loadCards();
 	}
+	// 지기도 같다(링크의 지기가 목록에 없어 전체 지기로 되돌릴 때도 MemberSelect 가 change 를 보낸다).
+	function onMemberChange(e) {
+		({ userId, includeMentees } = e.detail);
+		const url = new URL($page.url);
+		writeComposerMember(url.searchParams, { userId, includeMentees });
+		goto(url, { replaceState: true, keepFocus: true, noScroll: true });
+		loadCards();
+	}
+	let userName = ''; // 고른 지기의 이름(MemberSelect)
 
 	// PeriodSelect 가 불러온 학기 목록(최신순): 학기별 선곡의 학기를 그 학기(semester_id)로 연다.
 	// 못 받으면 날짜로 연다.
@@ -185,14 +203,21 @@
 			: semesterRange ?? current;
 	// 기간의 이름('2025-2학기', '이번 학기'). 학기 목록이 아직 없으면 머리말의 기간.
 	$: periodName = composerPeriodName(filter, semesters) || periodText;
-	// 탭 제목과 내려받는 파일 이름에 작곡가와, 기본값이 아닌 기간을 넣는다(이름을 못 받았으면 '작곡가 #id').
-	$: tabTitle = pageTitle(composer?.name, period === ALL ? '' : periodName, '작곡가');
+	// 고른 지기의 이름(목록을 못 받았으면 '지기 #id'), 견습 포함이면 '+견습'. 전체 지기면 ''.
+	$: memberText = memberFileText({ userId, name: userName, includeMentees });
+	// 탭 제목과 내려받는 파일 이름에 작곡가와, 기본값이 아닌 기간·지기를 넣는다(이름을 못 받았으면 '작곡가 #id').
+	$: tabTitle = pageTitle(composer?.name, period === ALL ? '' : periodName, memberText, '작곡가');
 	$: fileTag = [
 		composer ? composer.name : `작곡가 #${composerId}`,
-		period === ALL ? '' : periodText
+		period === ALL ? '' : periodText,
+		memberText
 	];
 	$: subtitleFor = (envelope) =>
-		envelope ? `${periodName} · 총 ${envelope.total_plays.toLocaleString()}곡` : '';
+		envelope
+			? [periodName, memberText, `총 ${envelope.total_plays.toLocaleString()}곡`]
+					.filter(Boolean)
+					.join(' · ')
+			: '';
 	$: timelineData = semesterSeries(timeline);
 	$: timelineOpt =
 		timelineData && countBarOption(timelineData, '학기별 선곡', subtitleFor(timeline));
@@ -201,7 +226,7 @@
 	$: conductorOpt =
 		conductors && horizontalBarOption(conductors, '많이 튼 지휘자', subtitleFor(conductors));
 	$: worksTable = works && works.items.length > 0 && composerWorksTable(works, composer);
-	// 링크는 모두 같은 기간을 연다. 곡 이름은 그 곡의 선곡 기록으로 간다.
+	// 링크는 모두 같은 기간·지기를 연다. 곡 이름은 그 곡의 선곡 기록으로 간다.
 	$: worksLinks = works ? works.items.map((item) => composerWorkHref(item.id, filter)) : [];
 	// 독주자·지휘자는 이 작곡가의 곡을 그 사람과 튼 선곡 기록으로 간다(표의 이름, 차트의 막대).
 	$: soloistLinks = composerRankLinks(composerId, 'soloists', soloists, filter);
@@ -214,11 +239,11 @@
 		const href = links[reversed ? barItemIndex(i, links.length) : i];
 		if (href) goto(href);
 	}
-	// 처음·마지막 날짜는 기간과 상관없이 그 곡의 전체 기록 기준이다(stats/works).
+	// 처음·마지막 날짜는 기간·지기와 상관없이 그 곡의 전체 기록 기준이다(stats/works).
 	$: worksSubtitle = works
 		? subtitleFor(works) +
 			(works.items.length >= WORKS_LIMIT ? ` · 상위 ${WORKS_LIMIT}곡` : '') +
-			(period === ALL ? '' : ' · 처음·마지막은 전체 기록 기준')
+			(period === ALL && !userId ? '' : ' · 처음·마지막은 전체 기록 기준')
 		: '';
 	$: count = (v) => (v == null ? '—' : v.toLocaleString());
 </script>
@@ -251,6 +276,13 @@
 					bind:semesters
 					{shownRange}
 					on:change={onPeriodChange}
+				/>
+				<MemberSelect
+					bind:userId
+					bind:includeMentees
+					bind:userName
+					emptyLabel="전체 지기"
+					on:change={onMemberChange}
 				/>
 			</div>
 		{/if}
@@ -305,8 +337,8 @@
 		{#if summary && summary.total_plays === 0}
 			<div class="empty-hint">
 				{period === ALL
-					? '아직 이 작곡가의 곡을 튼 적이 없습니다.'
-					: '이 기간에는 이 작곡가의 곡을 튼 적이 없습니다.'}
+					? `아직 ${userId ? '이 지기가 ' : ''}이 작곡가의 곡을 튼 적이 없습니다.`
+					: `이 기간에는 ${userId ? '이 지기가 ' : ''}이 작곡가의 곡을 튼 적이 없습니다.`}
 			</div>
 		{:else}
 			<div class="chart-grid">
@@ -385,10 +417,13 @@
 		width: 100%;
 		box-sizing: border-box;
 	}
+	/* 이름이 길거나 직접 지정을 열어 한 줄에 다 들어가지 않으면 컨트롤을 다음 줄 오른쪽에 둔다. */
 	.page-header {
 		display: flex;
+		flex-wrap: wrap;
 		align-items: center;
 		justify-content: space-between;
+		gap: 12px 16px;
 		margin-bottom: 20px;
 	}
 	.title-group {
@@ -410,8 +445,17 @@
 	}
 	.controls {
 		display: flex;
+		flex-wrap: wrap;
+		justify-content: flex-end;
 		align-items: center;
-		gap: 16px;
+		gap: 12px 16px;
+		margin-left: auto;
+	}
+	/* 지기 목록을 못 받으면 그 문구는 지기 칸의 오른쪽 끝에서 왼쪽으로 펼쳐진다(MemberSelect).
+	   바로 옆 기간 칸의 문구와 겹치지 않도록, 그동안만 지기 칸을 문구만큼 넓힌다. */
+	.controls :global(.member-select:has(select[aria-invalid='true'])) {
+		min-width: 260px;
+		justify-content: flex-end;
 	}
 	.page-link {
 		font-family: var(--small-medium-font-family, 'Noto Sans KR', sans-serif);
