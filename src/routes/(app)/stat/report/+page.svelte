@@ -11,6 +11,9 @@
 	import { historyHref, workHistoryHref, targetHistoryHref } from '$lib/playHistory.js';
 	import { DRILL_CARDS } from '$lib/statDrill.js';
 	import { pageTitle } from '$lib/statTitle.js';
+	import { downloadCsvTable, tableCsv } from '$lib/csvTable.js';
+	import { downloadName } from '$lib/statFileName.js';
+	import { todayStamp } from '$lib/csv.js';
 	import {
 		reportHref,
 		pickSemester,
@@ -305,6 +308,18 @@
 		firstsCard('firstWorks', '처음 튼 곡', firstWorks, '곡', '곡', semesterId)
 	];
 
+	// 'CSV 저장': 카드의 표를 보이는 그대로(횟수만 쉼표 없이) 내려받는다. 파일 이름은 통계처럼
+	// 학기결산_2025-2학기_많이 튼 작곡가_20261030.csv.
+	function saveCsv(card) {
+		if (!card.table) return;
+		const { headers, rows } = tableCsv(card.table);
+		downloadCsvTable(
+			downloadName(['학기결산', label, card.title, todayStamp()], 'csv'),
+			headers,
+			rows
+		);
+	}
+
 	const KPIS = [
 		['total_plays', '총 선곡'],
 		['sessions', '타임'],
@@ -419,6 +434,15 @@
 						tabindex="-1"
 						aria-labelledby={`report-${card.key}`}
 					>
+						<button
+							class="tool-btn csv-btn"
+							on:click={() => saveCsv(card)}
+							disabled={!!(loading[card.key] || errors[card.key] || !card.table)}
+							title="표를 CSV로 저장"
+							aria-label={`${card.title} CSV 저장`}
+						>
+							CSV 저장
+						</button>
 						<h2 id={`report-${card.key}`}>{card.title}</h2>
 						<p class="subtitle">상위 10 · {total(data[card.key])}</p>
 						{#if loading[card.key]}
@@ -448,6 +472,15 @@
 
 				{#each mixCards as card}
 					<section class="card wide" tabindex="-1" aria-labelledby={`report-${card.key}`}>
+						<button
+							class="tool-btn csv-btn"
+							on:click={() => saveCsv(card)}
+							disabled={!!(loading[card.key] || errors[card.key] || !card.table)}
+							title="표를 CSV로 저장"
+							aria-label={`${card.title} CSV 저장`}
+						>
+							CSV 저장
+						</button>
 						<h2 id={`report-${card.key}`}>{card.title}</h2>
 						<p class="subtitle">{card.subtitle}</p>
 						{#if loading[card.key]}
@@ -481,6 +514,15 @@
 
 				{#each firstsCards as card}
 					<section class="card wide breakable" tabindex="-1" aria-labelledby={`report-${card.key}`}>
+						<button
+							class="tool-btn csv-btn"
+							on:click={() => saveCsv(card)}
+							disabled={!!(loading[card.key] || errors[card.key] || !card.table)}
+							title="표를 CSV로 저장"
+							aria-label={`${card.title} CSV 저장`}
+						>
+							CSV 저장
+						</button>
 						<h2 id={`report-${card.key}`}>{card.title}</h2>
 						<p class="subtitle">{card.subtitle}</p>
 						{#if loading[card.key]}
@@ -607,8 +649,14 @@
 		padding: 4px 12px;
 		cursor: pointer;
 	}
-	.tool-btn:hover {
+	.tool-btn:hover:not(:disabled) {
 		background: var(--secondary-secondary-200, #fdf1e4);
+	}
+	.tool-btn:disabled {
+		color: var(--gray-gray-500);
+		border-color: var(--gray-gray-400);
+		background: var(--secondary-secondary-50);
+		cursor: default;
 	}
 	.empty-hint .tool-btn,
 	.kpi-error .tool-btn {
@@ -677,9 +725,17 @@
 		box-shadow: 4px 4px 5px 0px rgba(0, 0, 0, 0.08);
 		padding: 12px;
 		min-width: 0;
+		position: relative;
 	}
 	.card.wide {
 		grid-column: span 2;
+	}
+	/* ChartCard 의 저장 단추와 같은 자리·크기(카드 오른쪽 위) */
+	.csv-btn {
+		position: absolute;
+		top: 12px;
+		right: 12px;
+		padding: 3px 8px;
 	}
 	/* 차트 제목·부제(chartOptions.js 의 titleBlock)와 같은 글꼴·색 */
 	h2 {
