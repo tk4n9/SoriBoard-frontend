@@ -829,6 +829,7 @@
 					error={drillError}
 					retry={loadDrill}
 					scopeLabel={viewLabel}
+					{fileTag}
 					historyLink={drillHistoryLink}
 					workLink={drillWorkLink}
 					composerLink={drill.card === 'composers'

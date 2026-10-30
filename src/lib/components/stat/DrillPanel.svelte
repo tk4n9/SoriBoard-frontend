@@ -4,6 +4,9 @@
 	import { rankTable } from '$lib/statTable.js';
 	import { WORKS_LIMIT, workLabel } from '$lib/statDrill.js';
 	import { closeOnEscape } from '$lib/escapeKey.js';
+	import { downloadCsvTable, tableCsv } from '$lib/csvTable.js';
+	import { todayStamp } from '$lib/csv.js';
+	import { downloadName } from '$lib/statFileName.js';
 
 	// 순위 카드의 막대·행에서 연 패널: 그 대상의 곡(stats/works, 같은 기간·범위).
 	/** @type {import('$lib/statDrill.js').DrillTarget} */
@@ -19,6 +22,8 @@
 	export let workLink = null;
 	/** @type {(() => void) | null} */
 	export let retry = null; // 주면 불러오지 못한 패널에 '다시 시도' 단추가 보인다.
+	/** @type {string | string[]} */
+	export let fileTag = ''; // 내려받는 파일 이름에서 제목 뒤에 붙는 보기(기간, 지기 등, statFileName.js)
 
 	const dispatch = createEventDispatcher();
 	let panel;
@@ -34,6 +39,13 @@
 	function onRetry() {
 		panel.focus();
 		retry();
+	}
+
+	// 보이는 표 그대로(순위·곡·횟수) 저장한다. 파일 이름은 카드의 CSV 저장과 같은 꼴.
+	function saveCsv() {
+		if (!table) return;
+		const { headers, rows } = tableCsv(table);
+		downloadCsvTable(downloadName(['통계', title, fileTag, todayStamp()], 'csv'), headers, rows);
 	}
 
 	$: title = `${target.name}의 곡`;
@@ -67,6 +79,16 @@
 			<a class="history-link" href={historyLink}>
 				{works.total_plays.toLocaleString()}곡 모두 보기
 			</a>
+		{/if}
+		{#if !loading && !error && table}
+			<button
+				class="tool-btn"
+				on:click={saveCsv}
+				title="데이터(CSV)로 저장"
+				aria-label={`${title} CSV 저장`}
+			>
+				CSV 저장
+			</button>
 		{/if}
 		<button
 			class="tool-btn"
