@@ -33,3 +33,23 @@ export function seriesCsv(labels, labelHeader, series) {
 		rows: labels.map((label, i) => [label, ...series.map((s) => s.values[i])])
 	};
 }
+
+// 화면의 표(statTable.js 의 표)를 CSV 의 열로: 머리줄은 열 이름, 칸은 화면에 쓴 그대로다.
+// 다만 수치 열의 천 단위 쉼표(1,234)는 빼서 스프레드시트가 수로 읽게 한다. 순위·날짜·비율(23.4%)·
+// 변화(+1.2%p)·'—' 는 그대로 둔다.
+const GROUPED = /^\d{1,3}(,\d{3})+$/;
+
+/**
+ * @param {import('./statTable.js').Table} table
+ * @returns {{ headers: string[], rows: string[][] }}
+ */
+export function tableCsv(table) {
+	return {
+		headers: table.columns.map((column) => column.name),
+		rows: table.rows.map((row) =>
+			row.map((cell, i) =>
+				table.columns[i]?.numeric && GROUPED.test(cell) ? cell.replace(/,/g, '') : cell
+			)
+		)
+	};
+}
