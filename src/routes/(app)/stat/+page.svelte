@@ -362,7 +362,7 @@
 		}
 	}
 
-	// 부제: 현재 범위 + 전체 선곡 수.
+	// 드릴다운 패널의 범위(기간은 그 위 머리말에 있다).
 	$: scopeLabel = scope === 'individual' ? '개인' : '전체';
 	// 머리말 기간: 백엔드가 돌려준 범위. 아직 없으면 보낼 범위로 짐작한다(학기는 학기 목록의 연도·학기로).
 	$: semesterRange = semesterRangeOf(period, semesters);
@@ -391,8 +391,15 @@
 		periodTitle({ period, start: customStart, end: customEnd }, semesters),
 		'통계'
 	);
+	// 차트 부제: 기간(기간 선택의 이름, 학기 목록 전에는 머리말의 날짜) · 지기(개인) 또는 전체 · 전체 선곡 수.
+	// PNG로 저장한 차트, 표로 보기, 화면 낭독기의 차트 이름이 모두 이 보기를 말한다.
+	$: periodName =
+		(period === CURRENT
+			? '이번 학기'
+			: periodTitle({ period, start: customStart, end: customEnd }, semesters)) || periodText;
+	$: viewLabel = pageTitle(periodName, scope === 'individual' ? memberText : '전체');
 	$: subtitleFor = (envelope) =>
-		envelope ? `${scopeLabel} · 총 ${envelope.total_plays.toLocaleString()}곡` : '';
+		envelope ? `${viewLabel} · 총 ${envelope.total_plays.toLocaleString()}곡` : '';
 
 	$: composerOpt =
 		composers && horizontalBarOption(composers, '많이 튼 작곡가', subtitleFor(composers));
@@ -405,7 +412,7 @@
 	$: worksOpt = works && horizontalBarOption(works, '많이 튼 곡', subtitleFor(works));
 	$: timelineTitle = `${timelineBucketName(timelineBucket)} 선곡 추이`;
 	$: timelineData = timeline && timelineView(timeline);
-	$: timelineOpt = timelineData && timelineOption(timelineData, timelineTitle, scopeLabel);
+	$: timelineOpt = timelineData && timelineOption(timelineData, timelineTitle, viewLabel);
 	$: eraOpt = eras && eraPieOption(eras, '시대별 분포', subtitleFor(eras));
 	$: eraNote = unknownEraNote(eras);
 	$: genreOpt = genres && eraPieOption(genres, '장르별 분포', subtitleFor(genres));
@@ -416,7 +423,7 @@
 		labels: diversity.timeline.labels,
 		values: diversity.timeline.plays
 	};
-	$: countOpt = countData && countBarOption(countData, `${bucketLabel} 선곡 수`, scopeLabel);
+	$: countOpt = countData && countBarOption(countData, `${bucketLabel} 선곡 수`, viewLabel);
 	$: diversityOpt =
 		diversity &&
 		diversityLineOption(
