@@ -323,6 +323,8 @@
 			(period === ALL && !userId ? '' : ' · 처음·마지막은 전체 기록 기준')
 		: '';
 	$: count = (v) => (v == null ? '—' : v.toLocaleString());
+	// 머리글의 선곡 기록 링크와 총 선곡 숫자는 같은 목록(이 작곡가, 같은 기간·지기)을 연다.
+	$: historyLink = composerHistoryHref(composerId, [], filter);
 </script>
 
 <svelte:head>
@@ -341,7 +343,7 @@
 			{/if}
 			<a class="page-link" href={composerStatHref(filter)}>통계</a>
 			{#if composerId && !notFound}
-				<a class="page-link" href={composerHistoryHref(composerId, [], filter)}>선곡 기록</a>
+				<a class="page-link" href={historyLink}>선곡 기록</a>
 			{/if}
 		</div>
 		{#if composerId && !notFound}
@@ -378,7 +380,20 @@
 		{/if}
 		<div class="kpi-row">
 			<div class="kpi">
-				<div class="kpi-value">{count(summary?.total_plays)}</div>
+				<!-- 총 선곡 숫자는 그 선곡의 선곡 기록을 연다(0 이면 열 목록이 없어 글자 그대로) -->
+				<div class="kpi-value">
+					{#if summary?.total_plays > 0}
+						<a
+							class="kpi-link"
+							href={historyLink}
+							title="선곡 기록에서 보기"
+							aria-label="총 선곡 {count(summary.total_plays)}곡 선곡 기록에서 보기"
+							>{count(summary.total_plays)}</a
+						>
+					{:else}
+						{count(summary?.total_plays)}
+					{/if}
+				</div>
 				<div class="kpi-label">총 선곡</div>
 				<!-- 학기를 고르면 앞 학기와 견준 줄. 좁은 칸에서는 · 뒤에서만 줄을 바꾼다 -->
 				{#if changes.total_plays}
@@ -597,6 +612,15 @@
 		font-size: var(--large-font-size, 24px);
 		font-weight: 700;
 		color: var(--primary-primary-800, #6a5134);
+	}
+	.kpi-link {
+		color: inherit;
+		text-decoration: none;
+		text-underline-offset: 3px;
+	}
+	.kpi-link:hover,
+	.kpi-link:focus-visible {
+		text-decoration: underline;
 	}
 	/* 날짜는 작은 글씨로, 타일 높이가 숫자 타일과 같도록 줄 높이를 맞춘다 */
 	.kpi-value.small {
