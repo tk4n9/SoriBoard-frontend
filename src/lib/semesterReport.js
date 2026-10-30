@@ -192,15 +192,17 @@ export function mixTable(current, previous, nameHeader) {
 }
 
 // 상위 10 표(순위, 이름, 횟수)에 지난 학기 칸: 그 행의 지난 학기 상위 10 에서의 순위(순위 칸처럼
-// 같은 횟수는 같은 순위). 거기 없으면 '10위 밖', 지난 학기에 선곡이 없으면 '—'. 이름이 아니라 id 로
-// 맞춘다(이름이 같은 다른 대상). 지난 학기가 없거나 받지 못하면(null) 칸을 두지 않는다.
+// 같은 횟수는 같은 순위). 거기 없으면 '10위 밖'(limit 은 목록의 길이, 통계의 작곡가·독주자는 12),
+// 지난 학기에 선곡이 없으면 '—'. 이름이 아니라 id 로 맞춘다(이름이 같은 다른 대상).
+// 지난 학기가 없거나 받지 못하면(null) 칸을 두지 않는다.
 /**
  * @param {{ labels: string[], values: number[], items: { id: number }[] }} current
  * @param {{ total_plays: number, values: number[], items: { id: number }[] } | null} previous
  * @param {string} nameHeader
+ * @param {number} [limit]
  * @returns {import('./statTable.js').Table}
  */
-export function rankChangeTable(current, previous, nameHeader) {
+export function rankChangeTable(current, previous, nameHeader, limit = 10) {
 	const table = rankTable(current, nameHeader);
 	if (!previous) return table;
 	const empty = previous.total_plays === 0 || !previous.items.length;
@@ -211,7 +213,7 @@ export function rankChangeTable(current, previous, nameHeader) {
 		columns: [...table.columns, { name: '지난 학기', numeric: true }],
 		rows: table.rows.map((row, i) => {
 			const rank = before.get(current.items[i]?.id);
-			return [...row, empty ? '—' : rank ? `${rank}위` : '10위 밖'];
+			return [...row, empty ? '—' : rank ? `${rank}위` : `${limit}위 밖`];
 		})
 	};
 }

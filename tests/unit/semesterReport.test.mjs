@@ -244,6 +244,27 @@ test('rankChangeTable with an empty previous 학기 shows dashes', () => {
 	]);
 });
 
+test('rankChangeTable names the list’s length for a row missing from the previous 학기', () => {
+	const now = ranking([
+		[1, '브람스', 42],
+		[2, '바흐', 30]
+	]);
+	const before = ranking([[2, '바흐', 7]]);
+	assert.deepEqual(
+		rankChangeTable(now, before, '작곡가', 12).rows.map((row) => row[3]),
+		['12위 밖', '1위']
+	);
+	assert.deepEqual(
+		rankChangeTable(now, before, '작곡가').rows.map((row) => row[3]),
+		['10위 밖', '1위']
+	);
+	// 지난 학기에 선곡이 없으면 길이와 상관없이 '—'.
+	assert.deepEqual(
+		rankChangeTable(now, ranking([], 0), '작곡가', 12).rows.map((row) => row[3]),
+		['—', '—']
+	);
+});
+
 test('firstsTable lists name, first play and count in backend order', () => {
 	const table = firstsTable(
 		{
