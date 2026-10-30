@@ -394,6 +394,8 @@
 		requested: ''
 	};
 	$: historyLink = historyHref(historyFilter);
+	// 신청곡 칸의 숫자: 같은 목록에서 신청곡만.
+	$: requestedLink = historyHref({ ...historyFilter, requested: 'true' });
 	// drill-down 패널의 'N곡 모두 보기': stats/works 에 보낸 것과 같은 기간·지기·id 필터.
 	$: drillHistoryLink =
 		drill &&
@@ -450,8 +452,21 @@
 	{:else}
 		<!-- KPI 카드 -->
 		<div class="kpi-row" bind:this={summaryRow} tabindex="-1">
+			<!-- 선곡을 세는 두 칸의 숫자는 그 선곡의 선곡 기록을 연다(0 이면 열 목록이 없어 글자 그대로) -->
 			<div class="kpi">
-				<div class="kpi-value">{summary ? summary.total_plays.toLocaleString() : '—'}</div>
+				<div class="kpi-value">
+					{#if summary?.total_plays > 0}
+						<a
+							class="kpi-link"
+							href={historyLink}
+							title="선곡 기록에서 보기"
+							aria-label="총 선곡 {summary.total_plays.toLocaleString()}곡 선곡 기록에서 보기"
+							>{summary.total_plays.toLocaleString()}</a
+						>
+					{:else}
+						{summary ? summary.total_plays.toLocaleString() : '—'}
+					{/if}
+				</div>
 				<div class="kpi-label">총 선곡</div>
 			</div>
 			<!-- sessions·requested 가 없는 예전 백엔드에서는 '—' -->
@@ -463,7 +478,17 @@
 			</div>
 			<div class="kpi">
 				<div class="kpi-value">
-					{summary && summary.requested != null ? summary.requested.toLocaleString() : '—'}
+					{#if summary?.requested > 0}
+						<a
+							class="kpi-link"
+							href={requestedLink}
+							title="선곡 기록에서 보기"
+							aria-label="신청곡 {summary.requested.toLocaleString()}곡 선곡 기록에서 보기"
+							>{summary.requested.toLocaleString()}</a
+						>
+					{:else}
+						{summary && summary.requested != null ? summary.requested.toLocaleString() : '—'}
+					{/if}
 				</div>
 				<div class="kpi-label">신청곡</div>
 			</div>
@@ -779,6 +804,16 @@
 	}
 	.kpi-value.small {
 		font-size: var(--medium-font-size, 16px);
+	}
+	/* 머리말의 '선곡 기록' 링크처럼 밑줄은 가리키거나 키보드로 고를 때만 */
+	.kpi-link {
+		color: inherit;
+		text-decoration: none;
+		text-underline-offset: 3px;
+	}
+	.kpi-link:hover,
+	.kpi-link:focus-visible {
+		text-decoration: underline;
 	}
 	.kpi-value .date {
 		white-space: nowrap;
