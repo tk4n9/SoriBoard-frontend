@@ -6,7 +6,7 @@
 	import PeriodSelect from '$lib/components/stat/PeriodSelect.svelte';
 	import MemberSelect from '$lib/components/stat/MemberSelect.svelte';
 	import { horizontalBarOption, countBarOption } from '$lib/chartOptions.js';
-	import { rankTable, placeholderText } from '$lib/statTable.js';
+	import { placeholderText } from '$lib/statTable.js';
 	import { WORKS_LIMIT, barItemIndex } from '$lib/statDrill.js';
 	import { pageTitle } from '$lib/statTitle.js';
 	import { memberFileText, downloadName } from '$lib/statFileName.js';
@@ -14,7 +14,7 @@
 	import { downloadCsvTable, tableCsv } from '$lib/csvTable.js';
 	import { ALL, CURRENT, CUSTOM, periodRangeText, currentSemesterRange } from '$lib/statPeriod.js';
 	import { semesterRangeOf } from '$lib/statBucket.js';
-	import { previousSemester, kpiChangeText } from '$lib/semesterReport.js';
+	import { previousSemester, kpiChangeText, rankChangeTable } from '$lib/semesterReport.js';
 	import {
 		readComposerId,
 		readComposerPeriod,
@@ -57,12 +57,14 @@
 		if (!res.ok) throw new Error(`${endpoint} ${res.status}`);
 		return res.json();
 	};
+	// 독주자·지휘자 목록의 길이. 앞 학기의 목록도 같은 길이로 부른다(지난 학기 칸의 '10위 밖').
+	const LIMITS = { soloists: 10, conductors: 10 };
 	const cardRequests = {
 		summary: (id) => getJson('summary', id),
 		timeline: (id) => getJson('timeline', id, { bucket: 'semester' }),
 		works: (id) => getJson('works', id, { limit: String(WORKS_LIMIT) }),
-		soloists: (id) => getJson('soloists', id, { limit: '10' }),
-		conductors: (id) => getJson('conductors', id, { limit: '10' })
+		soloists: (id) => getJson('soloists', id, { limit: String(LIMITS.soloists) }),
+		conductors: (id) => getJson('conductors', id, { limit: String(LIMITS.conductors) })
 	};
 	const CARD_KEYS = Object.keys(cardRequests);
 
@@ -191,7 +193,11 @@
 
 	// 기간이 목록의 학기면 총 선곡·타임·곡 칸 아래에 바로 앞 학기와 견준 줄을 둔다(통계와 같다).
 	// 앞 학기의 요약은 같은 작곡가·지기·견습 포함으로 카드와 함께 부르고, 실패하면 줄만 없다.
+	// 많이 튼 독주자·지휘자 표에는 앞 학기 같은 길이의 목록에서의 순위를 붙인다(통계와 같다).
+	// 실패하면 그 표만 지금과 같다.
 	let previousSummary = null;
+	/** @type {Record<string, any>} 앞 학기의 독주자·지휘자 목록(LIMITS 의 키) */
+	let previousRanks = {};
 	let previousAsked = null; // 마지막으로 부른 앞 학기 id(없으면 null)
 	let previousGeneration = 0;
 	const previousOf = (p, list) => {
@@ -204,14 +210,26 @@
 		const previous = previousOf(period, semesters);
 		previousAsked = previous?.id ?? null;
 		previousSummary = null;
+		previousRanks = {};
 		if (!previous || !id) return;
-		try {
-			// getJson 은 extra 를 마지막에 넣으므로 기간의 semester_id 만 바뀌고 지기는 그대로다.
-			const result = await getJson('summary', id, { semester_id: String(previous.id) });
-			if (gen === previousGeneration) previousSummary = result;
-		} catch (e) {
-			if (gen === previousGeneration) console.error('작곡가 통계 로딩 실패 (지난 학기 summary)', e);
-		}
+		const ask = async (endpoint, apply, extra = {}) => {
+			try {
+				// getJson 은 extra 를 마지막에 넣으므로 기간의 semester_id 만 바뀌고 지기는 그대로다.
+				const result = await getJson(endpoint, id, { ...extra, semester_id: String(previous.id) });
+				if (gen === previousGeneration) apply(result);
+			} catch (e) {
+				if (gen === previousGeneration)
+					console.error(`작곡가 통계 로딩 실패 (지난 학기 ${endpoint})`, e);
+			}
+		};
+		await Promise.allSettled([
+			ask('summary', (result) => (previousSummary = result)),
+			...Object.entries(LIMITS).map(([key, limit]) =>
+				ask(key, (result) => (previousRanks = { ...previousRanks, [key]: result }), {
+					limit: String(limit)
+				})
+			)
+		]);
 	}
 	// 링크로 연 학기는 학기 목록이 온 뒤에야 앞 학기를 안다. 기간·지기·작곡가가 바뀔 때는 loadCards 가
 	// 이미 불렀으므로, 앞 학기가 마지막으로 부른 것과 다를 때만 부른다.
@@ -267,9 +285,12 @@
 		soloists && horizontalBarOption(soloists, '많이 튼 독주자', subtitleFor(soloists));
 	$: conductorOpt =
 		conductors && horizontalBarOption(conductors, '많이 튼 지휘자', subtitleFor(conductors));
-	// 표로 보기와 CSV 저장은 같은 표다(순위·이름·횟수).
-	$: soloistTable = soloists && rankTable(soloists, '연주자');
-	$: conductorTable = conductors && rankTable(conductors, '지휘자');
+	// 표로 보기와 CSV 저장은 같은 표다(순위·이름·횟수, 학기를 고르면 지난 학기).
+	$: soloistTable =
+		soloists && rankChangeTable(soloists, previousRanks.soloists, '연주자', LIMITS.soloists);
+	$: conductorTable =
+		conductors &&
+		rankChangeTable(conductors, previousRanks.conductors, '지휘자', LIMITS.conductors);
 	$: worksTable = works && works.items.length > 0 && composerWorksTable(works, composer);
 	// 많이 튼 곡의 CSV 저장: 차트 카드(ChartCard)처럼, 표가 보일 때만 그 곡들을 받는다.
 	$: canExportWorks = Boolean(worksTable) && !loading.works && !errors.works;
