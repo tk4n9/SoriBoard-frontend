@@ -611,6 +611,7 @@
 					works={drillWorks}
 					loading={drillLoading}
 					error={drillError}
+					retry={loadDrill}
 					{scopeLabel}
 					historyLink={drillHistoryLink}
 					workLink={drillWorkLink}

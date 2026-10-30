@@ -17,6 +17,8 @@
 	// 주면 곡 이름이 그 곡의 선곡 기록으로 가는 링크가 된다(stats/works 의 항목 → 주소 또는 null).
 	/** @type {((item: { id: number | null }) => string | null) | null} */
 	export let workLink = null;
+	/** @type {(() => void) | null} */
+	export let retry = null; // 주면 불러오지 못한 패널에 '다시 시도' 단추가 보인다.
 
 	const dispatch = createEventDispatcher();
 	let panel;
@@ -27,6 +29,12 @@
 		panel.focus({ preventScroll: true });
 		panel.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
 	});
+
+	// 누르면 단추가 사라지므로, 포커스가 본문으로 떨어지지 않도록 먼저 패널로 옮긴다.
+	function onRetry() {
+		panel.focus();
+		retry();
+	}
 
 	$: title = `${target.name}의 곡`;
 	$: items = works ? works.items : [];
@@ -77,7 +85,14 @@
 		{#if loading}
 			<div class="placeholder">불러오는 중...</div>
 		{:else if error}
-			<div class="placeholder error">{error}</div>
+			<div class="placeholder error">
+				{error}
+				{#if retry}
+					<button class="tool-btn" on:click={onRetry} aria-label={`${title} 다시 시도`}>
+						다시 시도
+					</button>
+				{/if}
+			</div>
 		{:else}
 			<div class="placeholder">이 기간에는 선곡이 없습니다</div>
 		{/if}
@@ -150,6 +165,7 @@
 		font-size: var(--medium-font-size, 16px);
 	}
 	.placeholder.error {
+		gap: 10px;
 		color: var(--secondary-secondary-800, #95560d);
 	}
 </style>
