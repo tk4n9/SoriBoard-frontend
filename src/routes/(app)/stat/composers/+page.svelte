@@ -86,6 +86,17 @@
 		goto(catalogHref(q), { replaceState: true, keepFocus: true, noScroll: true });
 		load();
 	}
+	// 검색란을 ✕(또는 Escape)로 비우면 곧바로 전체를 보인다. Enter 도 search 이벤트를 보내지만
+	// (브라우저에 따라 submit 앞이나 뒤에) 그때는 submit 이 검색하므로 넘어간다.
+	let enterKey = false;
+	const onSearchKeydown = (e) => (enterKey = e.key === 'Enter' && !e.isComposing);
+	function onSearchEvent(e) {
+		const byEnter = enterKey;
+		enterKey = false;
+		if (byEnter || e.currentTarget.value !== '' || !q) return;
+		query = '';
+		onSearch();
+	}
 
 	// 한 번에 한 줄만 고친다. 저장하면 백엔드의 답(다시 정한 시대)으로 그 줄을 바꾸고, 자리는 그대로 둔다.
 	/** @type {number | null} */
@@ -210,6 +221,8 @@
 				<input
 					type="search"
 					bind:value={query}
+					on:keydown={onSearchKeydown}
+					on:search={onSearchEvent}
 					placeholder="작곡가 이름"
 					aria-label="작곡가 검색"
 				/>

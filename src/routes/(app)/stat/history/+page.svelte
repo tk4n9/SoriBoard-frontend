@@ -175,6 +175,17 @@
 		query = q;
 		apply();
 	}
+	// 검색란을 ✕(또는 Escape)로 비우면 곧바로 전체를 보인다. Enter 도 search 이벤트를 보내지만
+	// (브라우저에 따라 submit 앞이나 뒤에) 그때는 submit 이 검색하므로 넘어간다.
+	let enterKey = false;
+	const onSearchKeydown = (e) => (enterKey = e.key === 'Enter' && !e.isComposing);
+	function onSearchEvent(e) {
+		const byEnter = enterKey;
+		enterKey = false;
+		if (byEnter || e.currentTarget.value !== '' || !q) return;
+		query = '';
+		onSearch();
+	}
 	const onPeriodChange = (e) => {
 		period = e.detail;
 		apply();
@@ -300,6 +311,8 @@
 				type="search"
 				bind:value={query}
 				bind:this={searchInput}
+				on:keydown={onSearchKeydown}
+				on:search={onSearchEvent}
 				placeholder="작곡가, 곡, 연주자, 지휘자, 오케스트라"
 				aria-label="선곡 검색"
 			/>
