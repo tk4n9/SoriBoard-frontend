@@ -5,7 +5,7 @@
 	import EChart from '$lib/components/stat/EChart.svelte';
 	import ReportTable from '$lib/components/stat/ReportTable.svelte';
 	import { eraPieOption } from '$lib/chartOptions.js';
-	import { rankTable, formatCount } from '$lib/statTable.js';
+	import { formatCount } from '$lib/statTable.js';
 	import { sortSemesters, semesterLabel } from '$lib/statPeriod.js';
 	import { composerHref } from '$lib/composerStats.js';
 	import { historyHref, workHistoryHref, targetHistoryHref } from '$lib/playHistory.js';
@@ -20,6 +20,7 @@
 		previousSemester,
 		mixTable,
 		mixSubtitle,
+		rankChangeTable,
 		loadWithPrevious,
 		firstsTable,
 		reportRangeText,
@@ -45,13 +46,13 @@
 		if (!res.ok) throw new Error(`${endpoint} ${res.status}`);
 		return res.json();
 	};
-	// 요약·시대·장르는 지난 학기와 견준다(지난 학기가 없으면 previous 는 null).
+	// 요약·상위 10·시대·장르는 지난 학기와 견준다(지난 학기가 없으면 previous 는 null).
 	// 지난 학기만 실패하면 이 학기만으로 그린다(semesterReport.js).
-	const withPrevious = async (endpoint) => {
+	const withPrevious = async (endpoint, extra = {}) => {
 		const before = previous;
 		const pair = await loadWithPrevious(
-			() => getJson(endpoint, semester.id),
-			before && (() => getJson(endpoint, before.id))
+			() => getJson(endpoint, semester.id, extra),
+			before && (() => getJson(endpoint, before.id, extra))
 		);
 		if (pair.previousError) {
 			console.error(`학기 결산 지난 학기 로딩 실패 (${endpoint})`, pair.previousError);
@@ -60,11 +61,11 @@
 	};
 	const cardRequests = {
 		summary: () => withPrevious('summary'),
-		composers: () => getJson('composers', semester.id, { limit: '10' }),
-		soloists: () => getJson('soloists', semester.id, { limit: '10' }),
-		works: () => getJson('works', semester.id, { limit: '10' }),
-		conductors: () => getJson('conductors', semester.id, { limit: '10' }),
-		orchestras: () => getJson('orchestras', semester.id, { limit: '10' }),
+		composers: () => withPrevious('composers', { limit: '10' }),
+		soloists: () => withPrevious('soloists', { limit: '10' }),
+		works: () => withPrevious('works', { limit: '10' }),
+		conductors: () => withPrevious('conductors', { limit: '10' }),
+		orchestras: () => withPrevious('orchestras', { limit: '10' }),
 		eras: () => withPrevious('eras'),
 		genres: () => withPrevious('genres'),
 		firstComposers: () => getJson('firsts', semester.id, { kind: 'composer' }),
@@ -78,17 +79,13 @@
 	let loading = Object.fromEntries(CARD_KEYS.map((key) => [key, true]));
 	/** @type {Record<string, string>} */
 	let errors = {};
-	$: ({
-		composers,
-		soloists,
-		works,
-		conductors,
-		orchestras,
-		eras,
-		genres,
-		firstComposers,
-		firstWorks
-	} = data);
+	$: ({ eras, genres, firstComposers, firstWorks } = data);
+	// 상위 10 은 이 학기의 목록을 그리고, 지난 학기의 목록과 견준 칸을 붙인다(rankChangeTable).
+	$: composers = data.composers?.current;
+	$: soloists = data.soloists?.current;
+	$: works = data.works?.current;
+	$: conductors = data.conductors?.current;
+	$: orchestras = data.orchestras?.current;
 	// KPI 칸은 이 학기의 요약, 그 아래 줄은 지난 학기의 요약과 견준다(없거나 실패하면 줄을 뺀다).
 	$: summary = data.summary?.current;
 	$: previousSummary = data.summary?.previous;
@@ -231,32 +228,40 @@
 		{
 			key: 'composers',
 			title: '많이 튼 작곡가',
-			table: composers?.labels.length ? rankTable(composers, '작곡가') : null,
+			table: composers?.labels.length
+				? rankChangeTable(composers, data.composers.previous, '작곡가')
+				: null,
 			links: linksOf(composers, semesterId)
 		},
 		{
 			key: 'soloists',
 			title: '많이 튼 독주자',
-			table: soloists?.labels.length ? rankTable(soloists, '연주자') : null,
+			table: soloists?.labels.length
+				? rankChangeTable(soloists, data.soloists.previous, '연주자')
+				: null,
 			links: performerLinksOf('soloists', soloists, semesterId)
 		},
 		{
 			key: 'works',
 			title: '많이 튼 곡',
-			table: works?.labels.length ? rankTable(works, '곡') : null,
+			table: works?.labels.length ? rankChangeTable(works, data.works.previous, '곡') : null,
 			links: workLinksOf(works, semesterId),
 			wide: true
 		},
 		{
 			key: 'conductors',
 			title: '많이 튼 지휘자',
-			table: conductors?.labels.length ? rankTable(conductors, '지휘자') : null,
+			table: conductors?.labels.length
+				? rankChangeTable(conductors, data.conductors.previous, '지휘자')
+				: null,
 			links: performerLinksOf('conductors', conductors, semesterId)
 		},
 		{
 			key: 'orchestras',
 			title: '많이 튼 오케스트라',
-			table: orchestras?.labels.length ? rankTable(orchestras, '오케스트라') : null,
+			table: orchestras?.labels.length
+				? rankChangeTable(orchestras, data.orchestras.previous, '오케스트라')
+				: null,
 			links: performerLinksOf('orchestras', orchestras, semesterId)
 		}
 	];
@@ -444,7 +449,7 @@
 							CSV 저장
 						</button>
 						<h2 id={`report-${card.key}`}>{card.title}</h2>
-						<p class="subtitle">상위 10 · {total(data[card.key])}</p>
+						<p class="subtitle">상위 10 · {total(data[card.key]?.current)}</p>
 						{#if loading[card.key]}
 							<div class="placeholder">불러오는 중...</div>
 						{:else if errors[card.key]}
