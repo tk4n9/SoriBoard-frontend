@@ -5,7 +5,7 @@
 	import EChart from '$lib/components/stat/EChart.svelte';
 	import ReportTable from '$lib/components/stat/ReportTable.svelte';
 	import { eraPieOption } from '$lib/chartOptions.js';
-	import { formatCount } from '$lib/statTable.js';
+	import { formatCount, groupEvenness } from '$lib/statTable.js';
 	import { sortSemesters, semesterLabel } from '$lib/statPeriod.js';
 	import { composerHref } from '$lib/composerStats.js';
 	import { historyHref, workHistoryHref, targetHistoryHref } from '$lib/playHistory.js';
@@ -24,7 +24,8 @@
 		loadWithPrevious,
 		firstsTable,
 		reportRangeText,
-		kpiChangeText
+		kpiChangeText,
+		evennessChangeText
 	} from '$lib/semesterReport.js';
 
 	// 한 학기의 결산(클럽 전체). 학기는 URL(semester_id)에 두고, 없으면 가장 최근 학기다.
@@ -68,6 +69,8 @@
 		orchestras: () => withPrevious('orchestras', { limit: '10' }),
 		eras: () => withPrevious('eras'),
 		genres: () => withPrevious('genres'),
+		// 선곡 다양성은 summary 만 쓴다. 월별 버킷이면 쓰지 않는 timeline 이 작다.
+		diversity: () => withPrevious('diversity', { bucket: 'month' }),
 		firstComposers: () => getJson('firsts', semester.id, { kind: 'composer' }),
 		firstWorks: () => getJson('firsts', semester.id, { kind: 'work' })
 	};
@@ -89,6 +92,9 @@
 	// KPI 칸은 이 학기의 요약, 그 아래 줄은 지난 학기의 요약과 견준다(없거나 실패하면 줄을 뺀다).
 	$: summary = data.summary?.current;
 	$: previousSummary = data.summary?.previous;
+	// 선곡 다양성의 칸: 이 학기와 지난 학기의 다양성 응답의 summary(통계의 칸과 같은 값).
+	$: diversity = data.diversity?.current?.summary;
+	$: previousDiversity = data.diversity?.previous?.summary;
 
 	// 다른 학기로 바꾸면 이전 학기의 늦은 응답은 버린다.
 	let generation = 0;
@@ -296,6 +302,18 @@
 	$: mixCards = [
 		mixCard('eras', '시대별 분포', eras, '시대', label, previousLabel),
 		mixCard('genres', '장르별 분포', genres, '장르', label, previousLabel)
+	];
+
+	// 선곡 다양성: 통계의 시대·장르 다양성 칸과 같은 정수 %와 지난 학기와 견준 줄(%p).
+	const pct = (v) => (v == null ? '—' : `${Math.round(v * 100)}%`);
+	const diversityTile = (name, now, before) => ({
+		name,
+		value: pct(groupEvenness(now)),
+		change: evennessChangeText(groupEvenness(now), groupEvenness(before))
+	});
+	$: diversityTiles = [
+		diversityTile('시대 다양성', diversity?.era, previousDiversity?.era),
+		diversityTile('장르 다양성', diversity?.genre, previousDiversity?.genre)
 	];
 
 	// 처음 튼 작곡가·곡: 클럽 전체에서 처음 튼 날이 이 학기인 것.
@@ -519,6 +537,42 @@
 					</section>
 				{/each}
 
+				<!-- 위의 두 분포를 한 숫자로: 통계의 선곡 다양성 칸(고유 곡 수는 위의 곡 칸과 같아 뺀다) -->
+				<section class="card wide" tabindex="-1" aria-labelledby="report-diversity">
+					<h2 id="report-diversity">선곡 다양성</h2>
+					<p class="subtitle">0%=편중 · 100%=고름 (가능한 모든 시대·장르를 고르게 틀수록 100%)</p>
+					{#if loading.diversity}
+						<div class="placeholder">불러오는 중...</div>
+					{:else if errors.diversity}
+						<div class="placeholder error">
+							선곡 다양성 — {errors.diversity}
+							<button
+								class="tool-btn"
+								on:click={(e) => retry('diversity', e, e.currentTarget.closest('section'))}
+								aria-label="선곡 다양성 다시 시도"
+							>
+								다시 시도
+							</button>
+						</div>
+					{:else}
+						<div class="kpi-row diversity-row">
+							{#each diversityTiles as tile}
+								<div class="kpi">
+									<div class="kpi-value">{tile.value}</div>
+									<div class="kpi-label">{tile.name}</div>
+									{#if tile.change}
+										{@const [diff, before] = tile.change.split(' · ')}
+										<div class="kpi-change">
+											<span>{diff} ·</span>
+											<span>{before}</span>
+										</div>
+									{/if}
+								</div>
+							{/each}
+						</div>
+					{/if}
+				</section>
+
 				{#each firstsCards as card}
 					<section class="card wide breakable" tabindex="-1" aria-labelledby={`report-${card.key}`}>
 						<button
@@ -712,6 +766,10 @@
 	}
 	.kpi-change span {
 		white-space: nowrap;
+	}
+	.diversity-row {
+		grid-template-columns: repeat(2, 1fr);
+		margin-bottom: 0;
 	}
 	.kpi-error {
 		margin: -8px 0 16px;
