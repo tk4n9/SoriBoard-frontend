@@ -187,10 +187,14 @@
 	const count = (v) => (v == null ? '—' : formatCount(v));
 	$: empty = summary && summary.total_plays === 0;
 
-	// 순위 표(상위 10). 작곡가 이름은 작곡가 페이지로, 독주자·지휘자·오케스트라·곡 이름은 이 학기에
-	// 그 대상·곡을 튼 선곡 기록으로 간다.
-	const linksOf = (envelope) =>
-		envelope ? envelope.items.map((item) => composerHref(item.id)) : [];
+	// 순위 표(상위 10). 작곡가 이름은 이 학기를 고른 작곡가 페이지로, 독주자·지휘자·오케스트라·곡
+	// 이름은 이 학기에 그 대상·곡을 튼 선곡 기록으로 간다.
+	const linksOf = (envelope, semesterId) =>
+		envelope && semesterId
+			? envelope.items.map((item) =>
+					composerHref(item.id, { period: semesterId, start: '', end: '' })
+				)
+			: [];
 	const workLinksOf = (envelope, semesterId) =>
 		envelope && semesterId
 			? envelope.items.map((item) => workHistoryHref(item.id, semesterId))
@@ -208,7 +212,7 @@
 			key: 'composers',
 			title: '많이 튼 작곡가',
 			table: composers?.labels.length ? rankTable(composers, '작곡가') : null,
-			links: linksOf(composers)
+			links: linksOf(composers, semesterId)
 		},
 		{
 			key: 'soloists',
@@ -274,13 +278,13 @@
 		key,
 		title,
 		table: firsts?.items.length ? firstsTable(firsts, nameHeader) : null,
-		links: nameHeader === '작곡가' ? linksOf(firsts) : workLinksOf(firsts, semesterId),
+		links: nameHeader === '작곡가' ? linksOf(firsts, semesterId) : workLinksOf(firsts, semesterId),
 		subtitle:
 			`클럽에서 이 학기에 처음 튼 ${nameHeader}` +
 			(firsts ? ` · ${firsts.items.length.toLocaleString()}${unit}` : '')
 	});
 	$: firstsCards = [
-		firstsCard('firstComposers', '처음 튼 작곡가', firstComposers, '작곡가', '명'),
+		firstsCard('firstComposers', '처음 튼 작곡가', firstComposers, '작곡가', '명', semesterId),
 		firstsCard('firstWorks', '처음 튼 곡', firstWorks, '곡', '곡', semesterId)
 	];
 
