@@ -137,7 +137,8 @@
 		orchestras: () => getJson('orchestras', { limit: 10 }),
 		timeline: () => getJson('timeline', { bucket: timelineBucket }),
 		eras: () => getJson('eras'),
-		diversity: () => getJson('diversity', { bucket: diversityBucket })
+		diversity: () => getJson('diversity', { bucket: diversityBucket }),
+		works: () => getJson('works', { limit: 10 })
 	};
 	// 다른 카드의 응답에서 꺼내 그리는 카드.
 	const pickCard = { genres: genreDistribution, diversityTiles };
@@ -149,8 +150,18 @@
 	let loading = Object.fromEntries(CARD_KEYS.map((key) => [key, true]));
 	/** @type {Record<string, string>} */
 	let errors = {};
-	$: ({ summary, composers, soloists, conductors, orchestras, timeline, eras, genres, diversity } =
-		data);
+	$: ({
+		summary,
+		composers,
+		soloists,
+		conductors,
+		orchestras,
+		timeline,
+		eras,
+		genres,
+		diversity,
+		works
+	} = data);
 	// 선곡 다양성의 칸: 다양성 응답의 summary. 주별/월별만 바꾸면 다시 부르지 않고 그대로 둔다.
 	$: tiles = data.diversityTiles;
 
@@ -377,6 +388,7 @@
 		conductors && horizontalBarOption(conductors, '많이 튼 지휘자', subtitleFor(conductors));
 	$: orchestraOpt =
 		orchestras && horizontalBarOption(orchestras, '많이 튼 오케스트라', subtitleFor(orchestras));
+	$: worksOpt = works && horizontalBarOption(works, '많이 튼 곡', subtitleFor(works));
 	$: timelineTitle = `${timelineBucketName(timelineBucket)} 선곡 추이`;
 	$: timelineData = timeline && timelineView(timeline);
 	$: timelineOpt = timelineData && timelineOption(timelineData, timelineTitle, scopeLabel);
@@ -443,6 +455,17 @@
 		drill && item.id != null
 			? historyHref({ ...historyFilter, targets: drillWorkTargets(drill, item.id) })
 			: null;
+	// 많이 튼 곡의 곡 하나: 같은 기간·지기에서 그 곡을 튼 선곡(표의 이름, 차트의 막대·이름).
+	$: worksLinks = works
+		? works.items.map((item) =>
+				historyHref({ ...historyFilter, targets: [{ param: 'music_id', id: String(item.id) }] })
+			)
+		: [];
+	// 막대는 1위가 맨 위에 오도록 뒤집혀 그려진다.
+	function openWork(e) {
+		const href = worksLinks[barItemIndex(e.detail.dataIndex, worksLinks.length)];
+		if (href) goto(href);
+	}
 	// 시계열 카드의 주·월·학기마다: 같은 지기의 그 기간 선곡 기록(표의 기간, 차트의 막대·점).
 	$: timelineLinks = bucketHistoryLinks(historyFilter, timeline, semesters);
 	$: diversityLinks = bucketHistoryLinks(
@@ -708,6 +731,19 @@
 				links={timelineLinks}
 				on:itemclick={(e) => openBucket(timelineLinks, e)}
 				csvHeaders={['기간', '횟수']}
+			/>
+			<ChartCard
+				title="많이 튼 곡"
+				option={worksOpt}
+				data={works}
+				loading={loading.works}
+				error={errors.works}
+				retry={() => retry('works')}
+				{fileTag}
+				links={worksLinks}
+				on:itemclick={openWork}
+				table={works && rankTable(works, '곡')}
+				csvHeaders={['곡', '횟수']}
 			/>
 		</div>
 		{#if drill}
