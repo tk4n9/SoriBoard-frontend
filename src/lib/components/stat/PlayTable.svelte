@@ -6,6 +6,9 @@
 	/** @type {import('$lib/playHistory.js').Play[]} */
 	export let rows = [];
 	export let label = '선곡 기록';
+	// 작곡가 링크가 열 기간({ period, start, end }, composerHref 와 같다). 없으면 전체 기간.
+	/** @type {import('$lib/composerStats.js').ComposerPeriod | undefined} */
+	export let composerPeriod = undefined;
 </script>
 
 <table aria-label={label}>
@@ -30,7 +33,7 @@
 						<div>
 							{#if work.composerId}<a
 									class="composer"
-									href={composerHref(work.composerId)}
+									href={composerHref(work.composerId, composerPeriod)}
 									title="이 작곡가 페이지 열기">{work.composer}</a
 								>{:else}{work.composer}{/if}{#if work.composer && work.title}{' - '}{/if}{work.title}
 						</div>
