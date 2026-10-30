@@ -449,7 +449,9 @@
 							CSV 저장
 						</button>
 						<h2 id={`report-${card.key}`}>{card.title}</h2>
-						<p class="subtitle">상위 10 · {total(data[card.key]?.current)}</p>
+						<p class="subtitle">
+							{['상위 10', total(data[card.key]?.current)].filter(Boolean).join(' · ')}
+						</p>
 						{#if loading[card.key]}
 							<div class="placeholder">불러오는 중...</div>
 						{:else if errors[card.key]}
