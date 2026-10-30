@@ -78,13 +78,14 @@ export async function loadWithPrevious(loadNow, loadBefore) {
 const totalText = (envelope) => (envelope ? `총 ${envelope.total_plays.toLocaleString()}곡` : '');
 
 // 시대·장르 카드의 부제: 이 학기와 지난 학기의 선곡 수. 지난 학기를 못 받았으면 그렇다고 쓴다.
+// 불러오는 중이거나 실패해 pair 가 없으면 학기 이름만 쓴다(상위 10 카드처럼 줄을 비우지 않는다).
 /**
  * @param {{ current: { total_plays: number }, previous: { total_plays: number } | null, previousError?: unknown } | null | undefined} pair
  * @param {string} now 이 학기 이름
  * @param {string} before 지난 학기 이름(없으면 '')
  */
 export function mixSubtitle(pair, now, before) {
-	if (!pair) return '';
+	if (!pair) return now;
 	const head = `${now} ${totalText(pair.current)}`;
 	if (pair.previous) return `${head} · 지난 학기(${before}) ${totalText(pair.previous)}`;
 	if (pair.previousError) return `${head} · 지난 학기(${before})를 불러오지 못했습니다`;

@@ -348,7 +348,8 @@ test('loadWithPrevious sends both requests at once', async () => {
 
 test('mixSubtitle names both 학기, a missing one, or a failed one', () => {
 	const current = { total_plays: 1903 };
-	assert.equal(mixSubtitle(null, '2025-2학기', '2025-1학기'), '');
+	assert.equal(mixSubtitle(null, '2025-2학기', '2025-1학기'), '2025-2학기');
+	assert.equal(mixSubtitle(null, '', ''), '');
 	assert.equal(
 		mixSubtitle({ current, previous: { total_plays: 610 } }, '2025-2학기', '2025-1학기'),
 		'2025-2학기 총 1,903곡 · 지난 학기(2025-1학기) 총 610곡'
