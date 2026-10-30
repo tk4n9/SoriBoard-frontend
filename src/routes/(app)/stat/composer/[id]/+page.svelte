@@ -14,6 +14,7 @@
 	import { downloadCsvTable } from '$lib/csvTable.js';
 	import { ALL, CURRENT, CUSTOM, periodRangeText, currentSemesterRange } from '$lib/statPeriod.js';
 	import { semesterRangeOf } from '$lib/statBucket.js';
+	import { previousSemester, kpiChangeText } from '$lib/semesterReport.js';
 	import {
 		readComposerId,
 		readComposerPeriod,
@@ -126,6 +127,7 @@
 		errors = {};
 		appliedFilters = null;
 		loading = Object.fromEntries(CARD_KEYS.map((key) => [key, Boolean(id)]));
+		loadPreviousSummary();
 		if (!id) return;
 		for (const key of CARD_KEYS) loadCard(key, id, gen);
 	}
@@ -186,6 +188,43 @@
 	// PeriodSelect 가 불러온 학기 목록(최신순): 학기별 선곡의 학기를 그 학기(semester_id)로 연다.
 	// 못 받으면 날짜로 연다.
 	let semesters = [];
+
+	// 기간이 목록의 학기면 총 선곡·타임·곡 칸 아래에 바로 앞 학기와 견준 줄을 둔다(통계와 같다).
+	// 앞 학기의 요약은 같은 작곡가·지기·견습 포함으로 카드와 함께 부르고, 실패하면 줄만 없다.
+	let previousSummary = null;
+	let previousAsked = null; // 마지막으로 부른 앞 학기 id(없으면 null)
+	let previousGeneration = 0;
+	const previousOf = (p, list) => {
+		const chosen = list.find((s) => String(s.id) === p);
+		return chosen ? previousSemester(chosen, list) : null;
+	};
+	async function loadPreviousSummary() {
+		const id = readComposerId($page.params.id);
+		const gen = ++previousGeneration; // 이전 보기의 늦은 응답은 버린다.
+		const previous = previousOf(period, semesters);
+		previousAsked = previous?.id ?? null;
+		previousSummary = null;
+		if (!previous || !id) return;
+		try {
+			// getJson 은 extra 를 마지막에 넣으므로 기간의 semester_id 만 바뀌고 지기는 그대로다.
+			const result = await getJson('summary', id, { semester_id: String(previous.id) });
+			if (gen === previousGeneration) previousSummary = result;
+		} catch (e) {
+			if (gen === previousGeneration) console.error('작곡가 통계 로딩 실패 (지난 학기 summary)', e);
+		}
+	}
+	// 링크로 연 학기는 학기 목록이 온 뒤에야 앞 학기를 안다. 기간·지기·작곡가가 바뀔 때는 loadCards 가
+	// 이미 불렀으므로, 앞 학기가 마지막으로 부른 것과 다를 때만 부른다.
+	$: previousId = previousOf(period, semesters)?.id ?? null;
+	$: if (previousId !== previousAsked) loadPreviousSummary();
+	// 칸마다 { diff: '+3', before: '지난 학기 9' }. 앞 학기가 없거나 아직 없으면 null.
+	$: changes = Object.fromEntries(
+		['total_plays', 'sessions', 'works'].map((key) => {
+			const text = kpiChangeText(summary?.[key], previousSummary?.[key]);
+			const [diff, before] = text.split(' · ');
+			return [key, text ? { diff, before } : null];
+		})
+	);
 
 	$: title = composer ? composer.name : composerError ? `작곡가 #${composerId}` : '작곡가';
 	// 머리말 기간: 백엔드가 돌려준 범위. 아직 없으면 보낼 범위로 짐작한다(학기는 학기 목록의 연도·학기로).
@@ -317,14 +356,33 @@
 			<div class="kpi">
 				<div class="kpi-value">{count(summary?.total_plays)}</div>
 				<div class="kpi-label">총 선곡</div>
+				<!-- 학기를 고르면 앞 학기와 견준 줄. 좁은 칸에서는 · 뒤에서만 줄을 바꾼다 -->
+				{#if changes.total_plays}
+					<div class="kpi-change">
+						<span>{changes.total_plays.diff} ·</span>
+						<span>{changes.total_plays.before}</span>
+					</div>
+				{/if}
 			</div>
 			<div class="kpi">
 				<div class="kpi-value">{count(summary?.sessions)}</div>
 				<div class="kpi-label">타임</div>
+				{#if changes.sessions}
+					<div class="kpi-change">
+						<span>{changes.sessions.diff} ·</span>
+						<span>{changes.sessions.before}</span>
+					</div>
+				{/if}
 			</div>
 			<div class="kpi">
 				<div class="kpi-value">{count(summary?.works)}</div>
 				<div class="kpi-label">곡</div>
+				{#if changes.works}
+					<div class="kpi-change">
+						<span>{changes.works.diff} ·</span>
+						<span>{changes.works.before}</span>
+					</div>
+				{/if}
 			</div>
 			<div class="kpi">
 				<div class="kpi-value small">{summary?.date_start ?? '—'}</div>
@@ -525,6 +583,15 @@
 		font-family: var(--small-medium-font-family, 'Noto Sans KR', sans-serif);
 		font-size: var(--small-medium-font-size, 13px);
 		color: var(--gray-gray-600, #7c7c7c);
+	}
+	.kpi-change {
+		margin-top: 2px;
+		font-family: var(--small-medium-font-family, 'Noto Sans KR', sans-serif);
+		font-size: 12px;
+		color: var(--gray-gray-600, #7c7c7c);
+	}
+	.kpi-change span {
+		white-space: nowrap;
 	}
 	.kpi-error {
 		margin: -8px 0 16px;
