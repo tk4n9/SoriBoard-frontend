@@ -54,7 +54,7 @@
 	} from '$lib/statPeriod.js';
 	import { historyHref, drillWorkTargets, bucketHistoryLinks } from '$lib/playHistory.js';
 	import { composerHref } from '$lib/composerStats.js';
-	import { reportHref } from '$lib/semesterReport.js';
+	import { reportHref, previousSemester, kpiChangeText } from '$lib/semesterReport.js';
 	import { memberFileText } from '$lib/statFileName.js';
 	import { pageTitle, periodTitle } from '$lib/statTitle.js';
 
@@ -160,6 +160,7 @@
 	async function load(keys) {
 		// 개인 범위인데 지기 미선택이면 로드 보류.
 		if (scope === 'individual' && !userId) return;
+		if (keys.includes('summary')) loadPreviousSummary();
 		const id = requests.begin(keys);
 		for (const key of keys) {
 			// 불러오는 동안(그리고 실패한 뒤) 이전 필터의 수치가 새 필터의 이름으로 남아 보이지 않도록 비운다.
@@ -205,6 +206,43 @@
 		loadDrill();
 		return load(CARD_KEYS);
 	};
+
+	// 기간이 목록의 학기면 KPI 칸 아래에 바로 앞 학기와 견준 줄을 둔다(학기 결산과 같다).
+	// 앞 학기의 요약은 같은 범위·지기·견습 포함으로 요약과 함께 부르고, 실패하면 줄만 없다.
+	let previousSummary = null;
+	let previousAsked = null; // 마지막으로 부른 앞 학기 id(없으면 null)
+	const previousOf = (p, list) => {
+		const chosen = list.find((s) => String(s.id) === p);
+		return chosen ? previousSemester(chosen, list) : null;
+	};
+	async function loadPreviousSummary() {
+		const id = requests.begin(['previousSummary']); // 이전 보기의 늦은 응답은 버린다.
+		const previous = previousOf(period, semesters);
+		previousAsked = previous?.id ?? null;
+		previousSummary = null;
+		if (!previous || (scope === 'individual' && !userId)) return;
+		try {
+			// buildQuery 는 extra 를 마지막에 넣으므로 기간의 semester_id 만 바뀌고 지기는 그대로다.
+			const result = await getJson('summary', { semester_id: String(previous.id) });
+			if (requests.isLatest('previousSummary', id)) previousSummary = result;
+		} catch (e) {
+			if (requests.isLatest('previousSummary', id)) console.error('통계 로딩 실패 (지난 학기)', e);
+		}
+	}
+	// 링크로 연 학기는 학기 목록이 온 뒤에야 앞 학기를 안다. 기간·범위가 바뀔 때는 load 가 이미
+	// 불렀으므로, 앞 학기가 마지막으로 부른 것과 다를 때만 부른다.
+	$: previousId = previousOf(period, semesters)?.id ?? null;
+	$: if (previousId !== previousAsked) loadPreviousSummary();
+	// 칸마다 { diff: '+32', before: '지난 학기 280' }. 앞 학기가 없거나 아직 없으면 null.
+	$: changes = Object.fromEntries(
+		['total_plays', 'sessions', 'requested', 'composers', 'works', 'conductors', 'orchestras'].map(
+			(key) => {
+				const text = kpiChangeText(summary?.[key], previousSummary?.[key]);
+				const [diff, before] = text.split(' · ');
+				return [key, text ? { diff, before } : null];
+			}
+		)
+	);
 
 	// drill-down: 순위 카드의 막대나 표의 행 → 그 대상의 곡(같은 기간·범위, statDrill.js).
 	// 기간·범위가 바뀌면 같은 대상(id)으로 다시 불러온다.
@@ -468,6 +506,13 @@
 					{/if}
 				</div>
 				<div class="kpi-label">총 선곡</div>
+				<!-- 학기를 고르면 앞 학기와 견준 줄. 좁은 칸에서는 · 뒤에서만 줄을 바꾼다 -->
+				{#if changes.total_plays}
+					<div class="kpi-change">
+						<span>{changes.total_plays.diff} ·</span>
+						<span>{changes.total_plays.before}</span>
+					</div>
+				{/if}
 			</div>
 			<!-- sessions·requested 가 없는 예전 백엔드에서는 '—' -->
 			<div class="kpi">
@@ -475,6 +520,12 @@
 					{summary && summary.sessions != null ? summary.sessions.toLocaleString() : '—'}
 				</div>
 				<div class="kpi-label">타임</div>
+				{#if changes.sessions}
+					<div class="kpi-change">
+						<span>{changes.sessions.diff} ·</span>
+						<span>{changes.sessions.before}</span>
+					</div>
+				{/if}
 			</div>
 			<div class="kpi">
 				<div class="kpi-value">
@@ -491,22 +542,52 @@
 					{/if}
 				</div>
 				<div class="kpi-label">신청곡</div>
+				{#if changes.requested}
+					<div class="kpi-change">
+						<span>{changes.requested.diff} ·</span>
+						<span>{changes.requested.before}</span>
+					</div>
+				{/if}
 			</div>
 			<div class="kpi">
 				<div class="kpi-value">{summary ? summary.composers.toLocaleString() : '—'}</div>
 				<div class="kpi-label">작곡가</div>
+				{#if changes.composers}
+					<div class="kpi-change">
+						<span>{changes.composers.diff} ·</span>
+						<span>{changes.composers.before}</span>
+					</div>
+				{/if}
 			</div>
 			<div class="kpi">
 				<div class="kpi-value">{summary ? summary.works.toLocaleString() : '—'}</div>
 				<div class="kpi-label">곡</div>
+				{#if changes.works}
+					<div class="kpi-change">
+						<span>{changes.works.diff} ·</span>
+						<span>{changes.works.before}</span>
+					</div>
+				{/if}
 			</div>
 			<div class="kpi">
 				<div class="kpi-value">{summary ? summary.conductors.toLocaleString() : '—'}</div>
 				<div class="kpi-label">지휘자</div>
+				{#if changes.conductors}
+					<div class="kpi-change">
+						<span>{changes.conductors.diff} ·</span>
+						<span>{changes.conductors.before}</span>
+					</div>
+				{/if}
 			</div>
 			<div class="kpi">
 				<div class="kpi-value">{summary ? summary.orchestras.toLocaleString() : '—'}</div>
 				<div class="kpi-label">오케스트라</div>
+				{#if changes.orchestras}
+					<div class="kpi-change">
+						<span>{changes.orchestras.diff} ·</span>
+						<span>{changes.orchestras.before}</span>
+					</div>
+				{/if}
 			</div>
 			<div class="kpi span2">
 				<div class="kpi-value small">
@@ -829,6 +910,15 @@
 		font-family: var(--small-medium-font-family, 'Noto Sans KR', sans-serif);
 		font-size: var(--small-medium-font-size, 13px);
 		color: var(--gray-gray-600, #7c7c7c);
+	}
+	.kpi-change {
+		margin-top: 2px;
+		font-family: var(--small-medium-font-family, 'Noto Sans KR', sans-serif);
+		font-size: 12px;
+		color: var(--gray-gray-600, #7c7c7c);
+	}
+	.kpi-change span {
+		white-space: nowrap;
 	}
 	.kpi-error {
 		margin: -8px 0 16px;
