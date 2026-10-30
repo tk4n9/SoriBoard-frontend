@@ -6,6 +6,7 @@ import {
 	previousSemester,
 	mergeLabels,
 	formatChange,
+	kpiChangeText,
 	mixTable,
 	mixSubtitle,
 	loadWithPrevious,
@@ -64,6 +65,24 @@ test('formatChange shows a signed %p with one decimal', () => {
 	assert.equal(formatChange(0), '0.0%p');
 	assert.equal(formatChange(-0.04), '0.0%p');
 	assert.equal(formatChange(0.05), '+0.1%p');
+});
+
+test('kpiChangeText compares a KPI with the previous 학기', () => {
+	assert.equal(kpiChangeText(312, 280), '+32 · 지난 학기 280');
+	assert.equal(kpiChangeText(41, 46), '-5 · 지난 학기 46');
+	assert.equal(kpiChangeText(12, 12), '0 · 지난 학기 12');
+	assert.equal(kpiChangeText(1234, 0), '+1,234 · 지난 학기 0');
+	assert.equal(kpiChangeText(0, 1234), '-1,234 · 지난 학기 1,234');
+	for (const [now, before] of [
+		[312, null],
+		[312, undefined],
+		[null, 280],
+		[undefined, 280],
+		[null, null],
+		[undefined, undefined]
+	]) {
+		assert.equal(kpiChangeText(now, before), '', `${now}, ${before}`);
+	}
 });
 
 test('mixTable compares each share with the previous 학기', () => {

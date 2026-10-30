@@ -113,6 +113,19 @@ export function formatChange(v) {
 	return `${rounded > 0 ? '+' : '-'}${Math.abs(rounded).toFixed(1)}%p`;
 }
 
+// KPI 칸 아래의 지난 학기 비교: '+32 · 지난 학기 280'. 어느 한쪽이 없으면(지난 학기 없음,
+// 불러오는 중, 실패) ''.
+/**
+ * @param {number | null | undefined} now
+ * @param {number | null | undefined} before
+ */
+export function kpiChangeText(now, before) {
+	if (now == null || before == null) return '';
+	const diff = now - before;
+	const sign = diff > 0 ? '+' : diff < 0 ? '-' : '';
+	return `${sign}${formatCount(Math.abs(diff))} · 지난 학기 ${formatCount(before)}`;
+}
+
 // 이름 → 비율(%, 소수 한 자리, 합계 100). 선곡이 없으면 null.
 /** @param {{ labels: string[], values: number[] }} data */
 function shareByLabel({ labels, values }) {

@@ -19,7 +19,8 @@
 		mixSubtitle,
 		loadWithPrevious,
 		firstsTable,
-		reportRangeText
+		reportRangeText,
+		kpiChangeText
 	} from '$lib/semesterReport.js';
 
 	// 한 학기의 결산(클럽 전체). 학기는 URL(semester_id)에 두고, 없으면 가장 최근 학기다.
@@ -41,7 +42,7 @@
 		if (!res.ok) throw new Error(`${endpoint} ${res.status}`);
 		return res.json();
 	};
-	// 시대·장르는 지난 학기와 견준다(지난 학기가 없으면 previous 는 null).
+	// 요약·시대·장르는 지난 학기와 견준다(지난 학기가 없으면 previous 는 null).
 	// 지난 학기만 실패하면 이 학기만으로 그린다(semesterReport.js).
 	const withPrevious = async (endpoint) => {
 		const before = previous;
@@ -55,7 +56,7 @@
 		return pair;
 	};
 	const cardRequests = {
-		summary: () => getJson('summary', semester.id),
+		summary: () => withPrevious('summary'),
 		composers: () => getJson('composers', semester.id, { limit: '10' }),
 		soloists: () => getJson('soloists', semester.id, { limit: '10' }),
 		works: () => getJson('works', semester.id, { limit: '10' }),
@@ -75,7 +76,6 @@
 	/** @type {Record<string, string>} */
 	let errors = {};
 	$: ({
-		summary,
 		composers,
 		soloists,
 		works,
@@ -86,6 +86,9 @@
 		firstComposers,
 		firstWorks
 	} = data);
+	// KPI 칸은 이 학기의 요약, 그 아래 줄은 지난 학기의 요약과 견준다(없거나 실패하면 줄을 뺀다).
+	$: summary = data.summary?.current;
+	$: previousSummary = data.summary?.previous;
 
 	// 다른 학기로 바꾸면 이전 학기의 늦은 응답은 버린다.
 	let generation = 0;
@@ -342,9 +345,18 @@
 	{:else if semester}
 		<div class="kpi-row" tabindex="-1" bind:this={kpiRow}>
 			{#each KPIS as [key, name]}
+				{@const change = kpiChangeText(summary?.[key], previousSummary?.[key])}
 				<div class="kpi">
 					<div class="kpi-value">{count(summary?.[key])}</div>
 					<div class="kpi-label">{name}</div>
+					{#if change}
+						{@const [diff, before] = change.split(' · ')}
+						<!-- 좁은 칸(인쇄)에서는 · 뒤에서만 줄을 바꾼다 -->
+						<div class="kpi-change">
+							<span>{diff} ·</span>
+							<span>{before}</span>
+						</div>
+					{/if}
 				</div>
 			{/each}
 		</div>
@@ -591,6 +603,15 @@
 		font-family: var(--small-medium-font-family, 'Noto Sans KR', sans-serif);
 		font-size: var(--small-medium-font-size, 13px);
 		color: var(--gray-gray-600, #7c7c7c);
+	}
+	.kpi-change {
+		margin-top: 2px;
+		font-family: var(--small-medium-font-family, 'Noto Sans KR', sans-serif);
+		font-size: 12px;
+		color: var(--gray-gray-600, #7c7c7c);
+	}
+	.kpi-change span {
+		white-space: nowrap;
 	}
 	.kpi-error {
 		margin: -8px 0 16px;
