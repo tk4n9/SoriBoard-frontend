@@ -26,7 +26,6 @@
 		semesterRangeOf
 	} from '$lib/statBucket.js';
 	import {
-		rankTable,
 		shareTable,
 		seriesTable,
 		formatEvenness,
@@ -59,7 +58,8 @@
 		previousSemester,
 		kpiChangeText,
 		evennessChangeText,
-		mixTable
+		mixTable,
+		rankChangeTable
 	} from '$lib/semesterReport.js';
 	import { memberFileText } from '$lib/statFileName.js';
 	import { pageTitle, periodTitle } from '$lib/statTitle.js';
@@ -133,18 +133,20 @@
 		return res.json();
 	}
 
+	// 순위 카드의 목록 길이. 앞 학기의 목록도 같은 길이로 부른다('12위 밖').
+	const LIMITS = { composers: 12, soloists: 12, conductors: 10, orchestras: 10, works: 10 };
 	// 카드는 따로 불러오고, 실패하면 그 카드에만 오류를 띄운다. 요청 하나가 여러 카드를 그릴 수 있다:
 	// 장르별 분포와 선곡 다양성의 칸은 따로 부르지 않고 다양성 응답으로 그린다(statCards.js).
 	const cardRequests = {
 		summary: () => getJson('summary'),
-		composers: () => getJson('composers', { limit: 12 }),
-		soloists: () => getJson('soloists', { limit: 12 }),
-		conductors: () => getJson('conductors', { limit: 10 }),
-		orchestras: () => getJson('orchestras', { limit: 10 }),
+		composers: () => getJson('composers', { limit: LIMITS.composers }),
+		soloists: () => getJson('soloists', { limit: LIMITS.soloists }),
+		conductors: () => getJson('conductors', { limit: LIMITS.conductors }),
+		orchestras: () => getJson('orchestras', { limit: LIMITS.orchestras }),
 		timeline: () => getJson('timeline', { bucket: timelineBucket }),
 		eras: () => getJson('eras'),
 		diversity: () => getJson('diversity', { bucket: diversityBucket }),
-		works: () => getJson('works', { limit: 10 })
+		works: () => getJson('works', { limit: LIMITS.works })
 	};
 	// 다른 카드의 응답에서 꺼내 그리는 카드.
 	const pickCard = { genres: genreDistribution, diversityTiles };
@@ -228,10 +230,13 @@
 	// 앞 학기의 요약은 같은 범위·지기·견습 포함으로 요약과 함께 부르고, 실패하면 줄만 없다.
 	// 시대·장르의 표도 앞 학기의 비율과 견준다(학기 결산의 mixTable). 실패하면 그 표만 지금과 같다.
 	// 선곡 다양성의 칸도 앞 학기의 다양성 응답과 견준다(버킷과 무관하므로 백엔드 기본 버킷으로 부른다).
+	// 많이 튼 표에는 앞 학기 같은 길이의 목록에서의 순위를 붙인다(학기 결산의 rankChangeTable).
 	let previousSummary = null;
 	let previousEras = null;
 	let previousGenres = null;
 	let previousTiles = null;
+	/** @type {Record<string, any>} 순위 카드별 앞 학기의 목록(LIMITS 의 키) */
+	let previousRanks = {};
 	let previousAsked = null; // 마지막으로 부른 앞 학기 id(없으면 null)
 	const previousOf = (p, list) => {
 		const chosen = list.find((s) => String(s.id) === p);
@@ -245,11 +250,12 @@
 		previousEras = null;
 		previousGenres = null;
 		previousTiles = null;
+		previousRanks = {};
 		if (!previous || (scope === 'individual' && !userId)) return;
-		const ask = async (endpoint, apply) => {
+		const ask = async (endpoint, apply, extra = {}) => {
 			try {
 				// buildQuery 는 extra 를 마지막에 넣으므로 기간의 semester_id 만 바뀌고 지기는 그대로다.
-				const result = await getJson(endpoint, { semester_id: String(previous.id) });
+				const result = await getJson(endpoint, { ...extra, semester_id: String(previous.id) });
 				if (requests.isLatest('previousSummary', id)) apply(result);
 			} catch (e) {
 				if (requests.isLatest('previousSummary', id))
@@ -261,7 +267,10 @@
 			ask('summary', (result) => (previousSummary = result)),
 			ask('eras', (result) => (previousEras = result)),
 			ask('genres', (result) => (previousGenres = result)),
-			ask('diversity', (result) => (previousTiles = diversityTiles(result)))
+			ask('diversity', (result) => (previousTiles = diversityTiles(result))),
+			...Object.entries(LIMITS).map(([key, limit]) =>
+				ask(key, (result) => (previousRanks = { ...previousRanks, [key]: result }), { limit })
+			)
 		]);
 	}
 	// 링크로 연 학기는 학기 목록이 온 뒤에야 앞 학기를 안다. 기간·범위가 바뀔 때는 load 가 이미
@@ -699,7 +708,8 @@
 				rowLabel="곡 보기"
 				on:itemclick={(e) => openBar('composers', e)}
 				on:rowselect={(e) => openDrill('composers', e.detail)}
-				table={composers && rankTable(composers, '작곡가')}
+				table={composers &&
+					rankChangeTable(composers, previousRanks.composers, '작곡가', LIMITS.composers)}
 				csvHeaders={['작곡가', '횟수']}
 			/>
 			<ChartCard
@@ -713,7 +723,8 @@
 				rowLabel="곡 보기"
 				on:itemclick={(e) => openBar('soloists', e)}
 				on:rowselect={(e) => openDrill('soloists', e.detail)}
-				table={soloists && rankTable(soloists, '연주자')}
+				table={soloists &&
+					rankChangeTable(soloists, previousRanks.soloists, '연주자', LIMITS.soloists)}
 				csvHeaders={['연주자', '횟수']}
 			/>
 			<ChartCard
@@ -727,7 +738,8 @@
 				rowLabel="곡 보기"
 				on:itemclick={(e) => openBar('conductors', e)}
 				on:rowselect={(e) => openDrill('conductors', e.detail)}
-				table={conductors && rankTable(conductors, '지휘자')}
+				table={conductors &&
+					rankChangeTable(conductors, previousRanks.conductors, '지휘자', LIMITS.conductors)}
 				csvHeaders={['지휘자', '횟수']}
 			/>
 			<ChartCard
@@ -741,7 +753,8 @@
 				rowLabel="곡 보기"
 				on:itemclick={(e) => openBar('orchestras', e)}
 				on:rowselect={(e) => openDrill('orchestras', e.detail)}
-				table={orchestras && rankTable(orchestras, '오케스트라')}
+				table={orchestras &&
+					rankChangeTable(orchestras, previousRanks.orchestras, '오케스트라', LIMITS.orchestras)}
 				csvHeaders={['오케스트라', '횟수']}
 			/>
 			<ChartCard
@@ -792,7 +805,7 @@
 				{fileTag}
 				links={worksLinks}
 				on:itemclick={openWork}
-				table={works && rankTable(works, '곡')}
+				table={works && rankChangeTable(works, previousRanks.works, '곡', LIMITS.works)}
 				csvHeaders={['곡', '횟수']}
 			/>
 		</div>
