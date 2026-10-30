@@ -54,7 +54,13 @@
 	} from '$lib/statPeriod.js';
 	import { historyHref, drillWorkTargets, bucketHistoryLinks } from '$lib/playHistory.js';
 	import { composerHref } from '$lib/composerStats.js';
-	import { reportHref, previousSemester, kpiChangeText, mixTable } from '$lib/semesterReport.js';
+	import {
+		reportHref,
+		previousSemester,
+		kpiChangeText,
+		evennessChangeText,
+		mixTable
+	} from '$lib/semesterReport.js';
 	import { memberFileText } from '$lib/statFileName.js';
 	import { pageTitle, periodTitle } from '$lib/statTitle.js';
 
@@ -221,9 +227,11 @@
 	// 기간이 목록의 학기면 KPI 칸 아래에 바로 앞 학기와 견준 줄을 둔다(학기 결산과 같다).
 	// 앞 학기의 요약은 같은 범위·지기·견습 포함으로 요약과 함께 부르고, 실패하면 줄만 없다.
 	// 시대·장르의 표도 앞 학기의 비율과 견준다(학기 결산의 mixTable). 실패하면 그 표만 지금과 같다.
+	// 선곡 다양성의 칸도 앞 학기의 다양성 응답과 견준다(버킷과 무관하므로 백엔드 기본 버킷으로 부른다).
 	let previousSummary = null;
 	let previousEras = null;
 	let previousGenres = null;
+	let previousTiles = null;
 	let previousAsked = null; // 마지막으로 부른 앞 학기 id(없으면 null)
 	const previousOf = (p, list) => {
 		const chosen = list.find((s) => String(s.id) === p);
@@ -236,6 +244,7 @@
 		previousSummary = null;
 		previousEras = null;
 		previousGenres = null;
+		previousTiles = null;
 		if (!previous || (scope === 'individual' && !userId)) return;
 		const ask = async (endpoint, apply) => {
 			try {
@@ -251,7 +260,8 @@
 		await Promise.allSettled([
 			ask('summary', (result) => (previousSummary = result)),
 			ask('eras', (result) => (previousEras = result)),
-			ask('genres', (result) => (previousGenres = result))
+			ask('genres', (result) => (previousGenres = result)),
+			ask('diversity', (result) => (previousTiles = diversityTiles(result)))
 		]);
 	}
 	// 링크로 연 학기는 학기 목록이 온 뒤에야 앞 학기를 안다. 기간·범위가 바뀔 때는 load 가 이미
@@ -267,6 +277,17 @@
 				return [key, text ? { diff, before } : null];
 			}
 		)
+	);
+	// 선곡 다양성의 칸도 같은 모양. 다양성은 보이는 정수 %끼리의 차이(%p)다.
+	$: tileChanges = Object.fromEntries(
+		Object.entries({
+			era: evennessChangeText(groupEvenness(tiles?.era), groupEvenness(previousTiles?.era)),
+			genre: evennessChangeText(groupEvenness(tiles?.genre), groupEvenness(previousTiles?.genre)),
+			distinct_works: kpiChangeText(tiles?.distinct_works, previousTiles?.distinct_works)
+		}).map(([key, text]) => {
+			const [diff, before] = text.split(' · ');
+			return [key, text ? { diff, before } : null];
+		})
 	);
 
 	// drill-down: 순위 카드의 막대나 표의 행 → 그 대상의 곡(같은 기간·범위, statDrill.js).
@@ -823,16 +844,34 @@
 			<div class="kpi">
 				<div class="kpi-value">{tiles ? pct(groupEvenness(tiles.era)) : '—'}</div>
 				<div class="kpi-label">시대 다양성</div>
+				{#if tileChanges.era}
+					<div class="kpi-change">
+						<span>{tileChanges.era.diff} ·</span>
+						<span>{tileChanges.era.before}</span>
+					</div>
+				{/if}
 			</div>
 			<div class="kpi">
 				<div class="kpi-value">{tiles ? pct(groupEvenness(tiles.genre)) : '—'}</div>
 				<div class="kpi-label">장르 다양성</div>
+				{#if tileChanges.genre}
+					<div class="kpi-change">
+						<span>{tileChanges.genre.diff} ·</span>
+						<span>{tileChanges.genre.before}</span>
+					</div>
+				{/if}
 			</div>
 			<div class="kpi">
 				<div class="kpi-value">
 					{tiles ? tiles.distinct_works.toLocaleString() : '—'}
 				</div>
 				<div class="kpi-label">고유 곡 수</div>
+				{#if tileChanges.distinct_works}
+					<div class="kpi-change">
+						<span>{tileChanges.distinct_works.diff} ·</span>
+						<span>{tileChanges.distinct_works.before}</span>
+					</div>
+				{/if}
 			</div>
 		</div>
 		<!-- 칸의 '—'는 잴 것이 없을 때도 쓰므로, 불러오지 못했으면 따로 알린다 -->
