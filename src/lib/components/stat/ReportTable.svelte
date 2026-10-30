@@ -3,12 +3,13 @@
 	/** @type {import('$lib/statTable.js').Table} */
 	export let table;
 	export let labelledby = ''; // 표 이름을 가진 요소(카드 제목)의 id
+	export let describedby = ''; // 표 설명을 가진 요소(카드 부제)의 id
 	// 주면 행의 이름 칸이 그 주소로 가는 링크가 된다(행마다, 없는 행은 글자 그대로).
 	/** @type {(string | null)[]} */
 	export let links = [];
 </script>
 
-<table aria-labelledby={labelledby || undefined}>
+<table aria-labelledby={labelledby || undefined} aria-describedby={describedby || undefined}>
 	<thead>
 		<tr>
 			{#each table.columns as column}

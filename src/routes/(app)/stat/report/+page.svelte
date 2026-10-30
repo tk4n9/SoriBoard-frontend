@@ -467,7 +467,7 @@
 							CSV 저장
 						</button>
 						<h2 id={`report-${card.key}`}>{card.title}</h2>
-						<p class="subtitle">
+						<p class="subtitle" id={`report-${card.key}-sub`}>
 							{['상위 10', total(data[card.key]?.current)].filter(Boolean).join(' · ')}
 						</p>
 						{#if loading[card.key]}
@@ -490,6 +490,7 @@
 								table={card.table}
 								links={card.links}
 								labelledby={`report-${card.key}`}
+								describedby={`report-${card.key}-sub`}
 							/>
 						{/if}
 					</section>
@@ -507,7 +508,7 @@
 							CSV 저장
 						</button>
 						<h2 id={`report-${card.key}`}>{card.title}</h2>
-						<p class="subtitle">{card.subtitle}</p>
+						<p class="subtitle" id={`report-${card.key}-sub`}>{card.subtitle}</p>
 						{#if loading[card.key]}
 							<div class="placeholder">불러오는 중...</div>
 						{:else if errors[card.key]}
@@ -530,7 +531,11 @@
 									<EChart option={pieOption(card.pair.current)} />
 								</div>
 								<div class="mix-table">
-									<ReportTable table={card.table} labelledby={`report-${card.key}`} />
+									<ReportTable
+										table={card.table}
+										labelledby={`report-${card.key}`}
+										describedby={`report-${card.key}-sub`}
+									/>
 								</div>
 							</div>
 						{/if}
@@ -585,7 +590,7 @@
 							CSV 저장
 						</button>
 						<h2 id={`report-${card.key}`}>{card.title}</h2>
-						<p class="subtitle">{card.subtitle}</p>
+						<p class="subtitle" id={`report-${card.key}-sub`}>{card.subtitle}</p>
 						{#if loading[card.key]}
 							<div class="placeholder">불러오는 중...</div>
 						{:else if errors[card.key]}
@@ -606,6 +611,7 @@
 								table={card.table}
 								links={card.links}
 								labelledby={`report-${card.key}`}
+								describedby={`report-${card.key}-sub`}
 							/>
 						{/if}
 					</section>

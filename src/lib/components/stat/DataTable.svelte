@@ -19,17 +19,19 @@
 	const dispatch = createEventDispatcher();
 
 	const titleId = `stat-table-${++nextId}`;
+	// 부제(기간·지기·총 몇 곡)는 표의 설명으로 읽힌다(차트의 이름이 부제까지 읽는 것처럼).
+	const subtitleId = titleId + '-sub';
 </script>
 
 <div class="table-view">
 	<div class="table-title" id={titleId}>{title}</div>
 	{#if subtitle}
-		<div class="table-subtitle">{subtitle}</div>
+		<div class="table-subtitle" id={subtitleId}>{subtitle}</div>
 	{/if}
 	<!-- 카드 높이 안에서 스크롤하므로, 키보드로도 스크롤할 수 있게 영역에 포커스를 준다. -->
 	<!-- svelte-ignore a11y-no-noninteractive-tabindex -->
 	<div class="table-scroll" role="region" aria-labelledby={titleId} tabindex="0">
-		<table aria-labelledby={titleId}>
+		<table aria-labelledby={titleId} aria-describedby={subtitle ? subtitleId : undefined}>
 			<thead>
 				<tr>
 					{#each table.columns as column}
