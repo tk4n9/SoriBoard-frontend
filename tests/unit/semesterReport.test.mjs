@@ -9,10 +9,12 @@ import {
 	kpiChangeText,
 	mixTable,
 	mixSubtitle,
+	rankChangeTable,
 	loadWithPrevious,
 	firstsTable,
 	reportRangeText
 } from '../../src/lib/semesterReport.js';
+import { rankTable } from '../../src/lib/statTable.js';
 
 // sortSemesters 순서(최신 학기 먼저)
 const sorted = [
@@ -129,6 +131,97 @@ test('mixTable without a previous 학기 drops the comparison', () => {
 test('mixTable with an empty previous 학기 shows dashes', () => {
 	const table = mixTable({ labels: ['고전'], values: [2] }, { labels: [], values: [] }, '시대');
 	assert.deepEqual(table.rows, [['고전', '2', '100.0%', '—', '—']]);
+});
+
+// 백엔드의 순위 봉투(_top_by): labels·values 와 같은 순서의 items { id, name, count }.
+const ranking = (rows, total = rows.reduce((acc, [, , count]) => acc + count, 0)) => ({
+	total_plays: total,
+	labels: rows.map(([, name]) => name),
+	values: rows.map(([, , count]) => count),
+	items: rows.map(([id, name, count]) => ({ id, name, count }))
+});
+
+test('rankChangeTable without a previous 학기 is the plain rank table', () => {
+	const now = ranking([
+		[7, '브람스', 42],
+		[3, '바흐', 1234]
+	]);
+	assert.deepEqual(rankChangeTable(now, null, '작곡가'), rankTable(now, '작곡가'));
+	assert.deepEqual(
+		rankChangeTable(now, null, '작곡가').columns.map((c) => c.name),
+		['순위', '작곡가', '횟수']
+	);
+});
+
+test('rankChangeTable shows each row’s rank in the previous 학기, ties as 순위 counts them', () => {
+	const now = ranking([
+		[1, '브람스', 42],
+		[2, '바흐', 30],
+		[3, '모차르트', 30],
+		[4, '하이든', 12],
+		[5, '슈만', 9]
+	]);
+	const before = ranking([
+		[4, '하이든', 9],
+		[2, '바흐', 7],
+		[3, '모차르트', 7],
+		[1, '브람스', 5],
+		[9, '말러', 4]
+	]);
+	const table = rankChangeTable(now, before, '작곡가');
+	assert.deepEqual(
+		table.columns.map((c) => [c.name, Boolean(c.numeric)]),
+		[
+			['순위', true],
+			['작곡가', false],
+			['횟수', true],
+			['지난 학기', true]
+		]
+	);
+	assert.equal(table.rowHeader, 1);
+	assert.deepEqual(table.rows, [
+		['1', '브람스', '42', '4위'],
+		['2', '바흐', '30', '2위'],
+		['2', '모차르트', '30', '2위'],
+		['4', '하이든', '12', '1위'],
+		['5', '슈만', '9', '10위 밖']
+	]);
+});
+
+test('rankChangeTable matches rows by id, not by name', () => {
+	const now = ranking([
+		[11, '김지휘', 8],
+		[12, '김지휘', 6]
+	]);
+	const before = ranking([
+		[30, '이지휘', 9],
+		[12, '김지휘', 5],
+		[13, '박지휘', 3],
+		[11, '김지휘', 2]
+	]);
+	assert.deepEqual(
+		rankChangeTable(now, before, '지휘자').rows.map((row) => row[3]),
+		['4위', '2위']
+	);
+	// 이름만 같은(id 가 다른) 대상은 지난 학기 상위 10 에 없는 것이다.
+	const renamed = ranking([[99, '김지휘', 4]]);
+	assert.deepEqual(
+		rankChangeTable(renamed, before, '지휘자').rows.map((row) => row[3]),
+		['10위 밖']
+	);
+});
+
+test('rankChangeTable with an empty previous 학기 shows dashes', () => {
+	const now = ranking([
+		[1, '브람스', 2],
+		[2, '바흐', 1]
+	]);
+	const table = rankChangeTable(now, ranking([], 0), '작곡가');
+	assert.equal(table.columns.length, 4);
+	assert.deepEqual(table.rows, [
+		['1', '브람스', '2', '—'],
+		['2', '바흐', '1', '—']
+	]);
 });
 
 test('firstsTable lists name, first play and count in backend order', () => {

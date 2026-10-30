@@ -1,6 +1,13 @@
-// 학기 결산(/stat/report?semester_id=<id>): 학기 고르기, 지난 학기, 시대·장르 비교 표,
+// 학기 결산(/stat/report?semester_id=<id>): 학기 고르기, 지난 학기, 상위 10·시대·장르 비교 표,
 // 처음 튼 작곡가·곡 표, 링크. 결산은 클럽 전체의 기록이다(지기별 순위는 없다).
-import { formatCount, sharePercents, formatShare, SHARE_PRECISION } from './statTable.js';
+import {
+	formatCount,
+	sharePercents,
+	formatShare,
+	SHARE_PRECISION,
+	rankTable,
+	competitionRanks
+} from './statTable.js';
 import { periodRangeText } from './statPeriod.js';
 import { bucketRange } from './statBucket.js';
 
@@ -167,6 +174,31 @@ export function mixTable(current, previous, nameHeader) {
 				);
 			}
 			return row;
+		})
+	};
+}
+
+// 상위 10 표(순위, 이름, 횟수)에 지난 학기 칸: 그 행의 지난 학기 상위 10 에서의 순위(순위 칸처럼
+// 같은 횟수는 같은 순위). 거기 없으면 '10위 밖', 지난 학기에 선곡이 없으면 '—'. 이름이 아니라 id 로
+// 맞춘다(이름이 같은 다른 대상). 지난 학기가 없거나 받지 못하면(null) 칸을 두지 않는다.
+/**
+ * @param {{ labels: string[], values: number[], items: { id: number }[] }} current
+ * @param {{ total_plays: number, values: number[], items: { id: number }[] } | null} previous
+ * @param {string} nameHeader
+ * @returns {import('./statTable.js').Table}
+ */
+export function rankChangeTable(current, previous, nameHeader) {
+	const table = rankTable(current, nameHeader);
+	if (!previous) return table;
+	const empty = previous.total_plays === 0 || !previous.items.length;
+	const ranks = competitionRanks(previous.values);
+	const before = new Map(previous.items.map((item, i) => [item.id, ranks[i]]));
+	return {
+		...table,
+		columns: [...table.columns, { name: '지난 학기', numeric: true }],
+		rows: table.rows.map((row, i) => {
+			const rank = before.get(current.items[i]?.id);
+			return [...row, empty ? '—' : rank ? `${rank}위` : '10위 밖'];
 		})
 	};
 }
