@@ -33,7 +33,7 @@
 		groupEvenness,
 		unknownEraNote
 	} from '$lib/statTable.js';
-	import { seriesCsv } from '$lib/csvTable.js';
+	import { seriesCsv, tableCsv } from '$lib/csvTable.js';
 	import {
 		barItemIndex,
 		drillTarget,
@@ -437,6 +437,12 @@
 	$: eraOpt = eras && eraPieOption(eras, '시대별 분포', subtitleFor(eras));
 	$: eraNote = unknownEraNote(eras);
 	$: genreOpt = genres && eraPieOption(genres, '장르별 분포', subtitleFor(genres));
+	// 표로 보기와 CSV 저장은 같은 표다(앞 학기가 있으면 지난 학기·변화 열까지, 학기 결산과 같다).
+	$: eraTable =
+		eras && (previousEras ? mixTable(eras, previousEras, '시대') : shareTable(eras, '시대'));
+	$: genreTable =
+		genres &&
+		(previousGenres ? mixTable(genres, previousGenres, '장르') : shareTable(genres, '장르'));
 
 	// 다양성: 버킷 라벨, 선곡 수 막대, 다양성(고른정도) 추이.
 	$: bucketLabel = diversityBucket === 'week' ? '주별' : '월별';
@@ -748,8 +754,8 @@
 				{fileTag}
 				note={eraNote}
 				noteLink={{ href: '/stat/composers', text: '작곡가 정리' }}
-				table={eras &&
-					(previousEras ? mixTable(eras, previousEras, '시대') : shareTable(eras, '시대'))}
+				table={eraTable}
+				csv={eraTable && tableCsv(eraTable)}
 				csvHeaders={['시대', '횟수']}
 			/>
 			<ChartCard
@@ -760,8 +766,8 @@
 				error={errors.genres}
 				retry={() => retry('genres')}
 				{fileTag}
-				table={genres &&
-					(previousGenres ? mixTable(genres, previousGenres, '장르') : shareTable(genres, '장르'))}
+				table={genreTable}
+				csv={genreTable && tableCsv(genreTable)}
 				csvHeaders={['장르', '횟수']}
 			/>
 			<ChartCard
