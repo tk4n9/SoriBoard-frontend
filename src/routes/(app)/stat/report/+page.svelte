@@ -8,7 +8,7 @@
 	import { rankTable, formatCount } from '$lib/statTable.js';
 	import { sortSemesters, semesterLabel } from '$lib/statPeriod.js';
 	import { composerHref } from '$lib/composerStats.js';
-	import { workHistoryHref, targetHistoryHref } from '$lib/playHistory.js';
+	import { historyHref, workHistoryHref, targetHistoryHref } from '$lib/playHistory.js';
 	import { DRILL_CARDS } from '$lib/statDrill.js';
 	import { pageTitle } from '$lib/statTitle.js';
 	import {
@@ -207,6 +207,23 @@
 				)
 			: [];
 	$: semesterId = semester ? String(semester.id) : '';
+	// 머리말의 '선곡 기록' 링크와 총 선곡 칸의 숫자: 이 학기의 선곡 목록(통계와 같은 링크).
+	// 신청곡 칸의 숫자는 같은 목록에서 신청곡만. 학기가 없으면(목록을 불러오는 중·실패) 링크도 없다.
+	$: historyFilter = semester && {
+		period: String(semester.id),
+		start: '',
+		end: '',
+		q: '',
+		userId: null,
+		includeMentees: false,
+		requested: ''
+	};
+	$: kpiLinks = historyFilter
+		? {
+				total_plays: historyHref(historyFilter),
+				requested: historyHref({ ...historyFilter, requested: 'true' })
+			}
+		: {};
 	$: topCards = [
 		{
 			key: 'composers',
@@ -315,6 +332,7 @@
 		<div class="controls">
 			{#if semester}
 				<a class="page-link" href={`/stat?semester_id=${semester.id}`}>통계</a>
+				<a class="page-link" href={kpiLinks.total_plays}>선곡 기록</a>
 			{:else}
 				<a class="page-link" href="/stat">통계</a>
 			{/if}
@@ -348,10 +366,23 @@
 		<div class="empty-hint">학기가 없습니다.</div>
 	{:else if semester}
 		<div class="kpi-row" tabindex="-1" bind:this={kpiRow}>
+			<!-- 총 선곡·신청곡의 숫자는 그 선곡의 선곡 기록을 연다(0 이나 '—' 이면 글자 그대로) -->
 			{#each KPIS as [key, name]}
 				{@const change = kpiChangeText(summary?.[key], previousSummary?.[key])}
 				<div class="kpi">
-					<div class="kpi-value">{count(summary?.[key])}</div>
+					<div class="kpi-value">
+						{#if kpiLinks[key] && summary?.[key] > 0}
+							<a
+								class="kpi-link"
+								href={kpiLinks[key]}
+								title="선곡 기록에서 보기"
+								aria-label="{name} {count(summary[key])}곡 선곡 기록에서 보기"
+								>{count(summary[key])}</a
+							>
+						{:else}
+							{count(summary?.[key])}
+						{/if}
+					</div>
 					<div class="kpi-label">{name}</div>
 					{#if change}
 						{@const [diff, before] = change.split(' · ')}
@@ -601,6 +632,16 @@
 		font-size: var(--large-font-size, 24px);
 		font-weight: 700;
 		color: var(--primary-primary-800, #6a5134);
+	}
+	/* 통계의 KPI 칸처럼 밑줄은 가리키거나 키보드로 고를 때만 */
+	.kpi-link {
+		color: inherit;
+		text-decoration: none;
+		text-underline-offset: 3px;
+	}
+	.kpi-link:hover,
+	.kpi-link:focus-visible {
+		text-decoration: underline;
 	}
 	.kpi-label {
 		margin-top: 4px;
