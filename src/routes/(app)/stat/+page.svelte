@@ -924,10 +924,13 @@
 		width: 100%;
 		box-sizing: border-box;
 	}
+	/* 직접 지정을 열어 한 줄에 다 들어가지 않으면 컨트롤을 다음 줄 오른쪽에 둔다. */
 	.page-header {
 		display: flex;
+		flex-wrap: wrap;
 		align-items: center;
 		justify-content: space-between;
+		gap: 12px 16px;
 		margin-bottom: 20px;
 	}
 	.title-group {
@@ -955,8 +958,11 @@
 	}
 	.controls {
 		display: flex;
+		flex-wrap: wrap;
+		justify-content: flex-end;
 		align-items: center;
-		gap: 16px;
+		gap: 12px 16px;
+		margin-left: auto;
 	}
 	.empty-hint {
 		text-align: center;
