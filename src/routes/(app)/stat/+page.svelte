@@ -392,8 +392,6 @@
 		}
 	}
 
-	// 드릴다운 패널의 범위(기간은 그 위 머리말에 있다).
-	$: scopeLabel = scope === 'individual' ? '개인' : '전체';
 	// 머리말 기간: 백엔드가 돌려준 범위. 아직 없으면 보낼 범위로 짐작한다(학기는 학기 목록의 연도·학기로).
 	$: semesterRange = semesterRangeOf(period, semesters);
 	$: periodText = appliedFilters
@@ -817,7 +815,7 @@
 					loading={drillLoading}
 					error={drillError}
 					retry={loadDrill}
-					{scopeLabel}
+					scopeLabel={viewLabel}
 					historyLink={drillHistoryLink}
 					workLink={drillWorkLink}
 					composerLink={drill.card === 'composers'
