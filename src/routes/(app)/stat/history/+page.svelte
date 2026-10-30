@@ -378,7 +378,10 @@
 
 	<section class="card" aria-label="선곡 목록" tabindex="-1" bind:this={listCard}>
 		{#if rows.length > 0}
-			<PlayTable {rows} composerPeriod={{ period, start: customStart, end: customEnd }} />
+			<PlayTable
+				{rows}
+				composerPeriod={{ period, start: customStart, end: customEnd, userId, includeMentees }}
+			/>
 		{:else if loading}
 			<div class="placeholder">불러오는 중...</div>
 		{:else if error}

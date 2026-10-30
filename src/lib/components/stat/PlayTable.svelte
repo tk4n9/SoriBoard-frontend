@@ -6,7 +6,8 @@
 	/** @type {import('$lib/playHistory.js').Play[]} */
 	export let rows = [];
 	export let label = '선곡 기록';
-	// 작곡가 링크가 열 기간({ period, start, end }, composerHref 와 같다). 없으면 전체 기간.
+	// 작곡가 링크가 열 기간과 지기({ period, start, end, userId, includeMentees }, composerHref 와 같다).
+	// 없으면 전체 기간·전체 지기.
 	/** @type {import('$lib/composerStats.js').ComposerPeriod | undefined} */
 	export let composerPeriod = undefined;
 </script>
