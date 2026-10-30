@@ -450,6 +450,18 @@
 	$: genreTable =
 		genres &&
 		(previousGenres ? mixTable(genres, previousGenres, '장르') : shareTable(genres, '장르'));
+	// 많이 튼 표도 같다: 순위·이름·횟수(앞 학기가 있으면 지난 학기 열까지).
+	$: composerTable =
+		composers && rankChangeTable(composers, previousRanks.composers, '작곡가', LIMITS.composers);
+	$: soloistTable =
+		soloists && rankChangeTable(soloists, previousRanks.soloists, '연주자', LIMITS.soloists);
+	$: conductorTable =
+		conductors &&
+		rankChangeTable(conductors, previousRanks.conductors, '지휘자', LIMITS.conductors);
+	$: orchestraTable =
+		orchestras &&
+		rankChangeTable(orchestras, previousRanks.orchestras, '오케스트라', LIMITS.orchestras);
+	$: worksTable = works && rankChangeTable(works, previousRanks.works, '곡', LIMITS.works);
 
 	// 다양성: 버킷 라벨, 선곡 수 막대, 다양성(고른정도) 추이.
 	$: bucketLabel = diversityBucket === 'week' ? '주별' : '월별';
@@ -706,8 +718,8 @@
 				rowLabel="곡 보기"
 				on:itemclick={(e) => openBar('composers', e)}
 				on:rowselect={(e) => openDrill('composers', e.detail)}
-				table={composers &&
-					rankChangeTable(composers, previousRanks.composers, '작곡가', LIMITS.composers)}
+				table={composerTable}
+				csv={composerTable && tableCsv(composerTable)}
 				csvHeaders={['작곡가', '횟수']}
 			/>
 			<ChartCard
@@ -721,8 +733,8 @@
 				rowLabel="곡 보기"
 				on:itemclick={(e) => openBar('soloists', e)}
 				on:rowselect={(e) => openDrill('soloists', e.detail)}
-				table={soloists &&
-					rankChangeTable(soloists, previousRanks.soloists, '연주자', LIMITS.soloists)}
+				table={soloistTable}
+				csv={soloistTable && tableCsv(soloistTable)}
 				csvHeaders={['연주자', '횟수']}
 			/>
 			<ChartCard
@@ -736,8 +748,8 @@
 				rowLabel="곡 보기"
 				on:itemclick={(e) => openBar('conductors', e)}
 				on:rowselect={(e) => openDrill('conductors', e.detail)}
-				table={conductors &&
-					rankChangeTable(conductors, previousRanks.conductors, '지휘자', LIMITS.conductors)}
+				table={conductorTable}
+				csv={conductorTable && tableCsv(conductorTable)}
 				csvHeaders={['지휘자', '횟수']}
 			/>
 			<ChartCard
@@ -751,8 +763,8 @@
 				rowLabel="곡 보기"
 				on:itemclick={(e) => openBar('orchestras', e)}
 				on:rowselect={(e) => openDrill('orchestras', e.detail)}
-				table={orchestras &&
-					rankChangeTable(orchestras, previousRanks.orchestras, '오케스트라', LIMITS.orchestras)}
+				table={orchestraTable}
+				csv={orchestraTable && tableCsv(orchestraTable)}
 				csvHeaders={['오케스트라', '횟수']}
 			/>
 			<ChartCard
@@ -803,7 +815,8 @@
 				{fileTag}
 				links={worksLinks}
 				on:itemclick={openWork}
-				table={works && rankChangeTable(works, previousRanks.works, '곡', LIMITS.works)}
+				table={worksTable}
+				csv={worksTable && tableCsv(worksTable)}
 				csvHeaders={['곡', '횟수']}
 			/>
 		</div>

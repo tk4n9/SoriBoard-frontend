@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { toCsvTable, seriesCsv, tableCsv } from '../../src/lib/csvTable.js';
 import { toCsv } from '../../src/lib/csv.js';
 import { rankTable } from '../../src/lib/statTable.js';
-import { mixTable, firstsTable } from '../../src/lib/semesterReport.js';
+import { mixTable, firstsTable, rankChangeTable } from '../../src/lib/semesterReport.js';
 
 test('a header row, then one line per row', () => {
 	assert.equal(
@@ -84,6 +84,28 @@ test('tableCsv writes a rank table as shown, with counts as plain numbers', () =
 			['3', '가상 작곡가 C', '999']
 		]
 	});
+});
+
+test('tableCsv puts the ranks of a 많이 튼 table first, ties as the table shows them', () => {
+	const current = {
+		labels: ['가상 작곡가 A', '가상 작곡가 B', '가상 작곡가 C', '가상 작곡가 D'],
+		values: [5, 3, 3, 1],
+		items: [{ id: 1 }, { id: 2 }, { id: 3 }, { id: 4 }]
+	};
+	const csv = tableCsv(rankTable(current, '작곡가'));
+	assert.deepEqual(csv.headers, ['순위', '작곡가', '횟수']);
+	assert.deepEqual(
+		csv.rows.map((row) => row[0]),
+		['1', '2', '2', '4']
+	);
+	// 통계는 앞 학기가 있으면 지난 학기 열까지 저장한다: '1위', '12위 밖' 은 글자 그대로.
+	const previous = { total_plays: 9, values: [6, 3], items: [{ id: 2 }, { id: 1 }] };
+	const saved = tableCsv(rankChangeTable(current, previous, '작곡가', 12));
+	assert.equal(
+		toCsvTable(saved.headers, saved.rows),
+		'순위,작곡가,횟수,지난 학기\n1,가상 작곡가 A,5,2위\n2,가상 작곡가 B,3,1위\n' +
+			'2,가상 작곡가 C,3,12위 밖\n4,가상 작곡가 D,1,12위 밖'
+	);
 });
 
 test('tableCsv keeps shares, changes and dashes of a mix table as text', () => {

@@ -11,7 +11,7 @@
 	import { pageTitle } from '$lib/statTitle.js';
 	import { memberFileText, downloadName } from '$lib/statFileName.js';
 	import { todayStamp } from '$lib/csv.js';
-	import { downloadCsvTable } from '$lib/csvTable.js';
+	import { downloadCsvTable, tableCsv } from '$lib/csvTable.js';
 	import { ALL, CURRENT, CUSTOM, periodRangeText, currentSemesterRange } from '$lib/statPeriod.js';
 	import { semesterRangeOf } from '$lib/statBucket.js';
 	import { previousSemester, kpiChangeText } from '$lib/semesterReport.js';
@@ -267,6 +267,9 @@
 		soloists && horizontalBarOption(soloists, '많이 튼 독주자', subtitleFor(soloists));
 	$: conductorOpt =
 		conductors && horizontalBarOption(conductors, '많이 튼 지휘자', subtitleFor(conductors));
+	// 표로 보기와 CSV 저장은 같은 표다(순위·이름·횟수).
+	$: soloistTable = soloists && rankTable(soloists, '연주자');
+	$: conductorTable = conductors && rankTable(conductors, '지휘자');
 	$: worksTable = works && works.items.length > 0 && composerWorksTable(works, composer);
 	// 많이 튼 곡의 CSV 저장: 차트 카드(ChartCard)처럼, 표가 보일 때만 그 곡들을 받는다.
 	$: canExportWorks = Boolean(worksTable) && !loading.works && !errors.works;
@@ -470,7 +473,8 @@
 					error={errors.soloists}
 					retry={() => retry('soloists')}
 					{fileTag}
-					table={soloists && rankTable(soloists, '연주자')}
+					table={soloistTable}
+					csv={soloistTable && tableCsv(soloistTable)}
 					links={soloistLinks}
 					on:itemclick={(e) => openBar(soloistLinks, e)}
 					csvHeaders={['연주자', '횟수']}
@@ -483,7 +487,8 @@
 					error={errors.conductors}
 					retry={() => retry('conductors')}
 					{fileTag}
-					table={conductors && rankTable(conductors, '지휘자')}
+					table={conductorTable}
+					csv={conductorTable && tableCsv(conductorTable)}
 					links={conductorLinks}
 					on:itemclick={(e) => openBar(conductorLinks, e)}
 					csvHeaders={['지휘자', '횟수']}
