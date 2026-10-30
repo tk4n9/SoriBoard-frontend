@@ -133,6 +133,19 @@ export function kpiChangeText(now, before) {
 	return `${sign}${formatCount(Math.abs(diff))} · 지난 학기 ${formatCount(before)}`;
 }
 
+// 다양성 칸(고른정도 0–1) 아래의 지난 학기 비교: '+4%p · 지난 학기 58%'. 칸처럼 먼저 각각을
+// 정수 %로 반올림하고 뺀다(보이는 두 값의 차이). 어느 한쪽이 없으면('—') ''.
+/**
+ * @param {number | null | undefined} now
+ * @param {number | null | undefined} before
+ */
+export function evennessChangeText(now, before) {
+	if (now == null || before == null) return '';
+	const [n, b] = [now, before].map((v) => Math.round(v * 100));
+	const sign = n > b ? '+' : n < b ? '-' : '';
+	return `${sign}${Math.abs(n - b)}%p · 지난 학기 ${b}%`;
+}
+
 // 이름 → 비율(%, 소수 한 자리, 합계 100). 선곡이 없으면 null.
 /** @param {{ labels: string[], values: number[] }} data */
 function shareByLabel({ labels, values }) {

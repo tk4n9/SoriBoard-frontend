@@ -7,6 +7,7 @@ import {
 	mergeLabels,
 	formatChange,
 	kpiChangeText,
+	evennessChangeText,
 	mixTable,
 	mixSubtitle,
 	rankChangeTable,
@@ -84,6 +85,25 @@ test('kpiChangeText compares a KPI with the previous 학기', () => {
 		[undefined, undefined]
 	]) {
 		assert.equal(kpiChangeText(now, before), '', `${now}, ${before}`);
+	}
+});
+
+test('evennessChangeText compares the shown percentages with the previous 학기', () => {
+	assert.equal(evennessChangeText(0.62, 0.58), '+4%p · 지난 학기 58%');
+	// 각각 먼저 반올림한다: 48% − 52%
+	assert.equal(evennessChangeText(0.484, 0.516), '-4%p · 지난 학기 52%');
+	assert.equal(evennessChangeText(0.621, 0.618), '0%p · 지난 학기 62%');
+	// 0 은 값이다(없음이 아니다)
+	assert.equal(evennessChangeText(0, 0.5), '-50%p · 지난 학기 50%');
+	assert.equal(evennessChangeText(1, 0), '+100%p · 지난 학기 0%');
+	for (const [now, before] of [
+		[0.62, null],
+		[0.62, undefined],
+		[null, 0.58],
+		[undefined, 0.58],
+		[null, null]
+	]) {
+		assert.equal(evennessChangeText(now, before), '', `${now}, ${before}`);
 	}
 });
 
