@@ -13,7 +13,7 @@
 	import { todayStamp } from '$lib/csv.js';
 	import { downloadCsvTable, tableCsv } from '$lib/csvTable.js';
 	import { ALL, CURRENT, CUSTOM, periodRangeText, currentSemesterRange } from '$lib/statPeriod.js';
-	import { semesterRangeOf } from '$lib/statBucket.js';
+	import { semesterRangeOf, timelineBucketName, timelineView } from '$lib/statBucket.js';
 	import { previousSemester, kpiChangeText, rankChangeTable } from '$lib/semesterReport.js';
 	import {
 		readComposerId,
@@ -30,7 +30,7 @@
 		composerRankLinks,
 		composerSemesterLinks,
 		composerFacts,
-		semesterSeries,
+		composerTimelineBucket,
 		composerWorksTable,
 		composerWorksCsv
 	} from '$lib/composerStats.js';
@@ -57,11 +57,16 @@
 		if (!res.ok) throw new Error(`${endpoint} ${res.status}`);
 		return res.json();
 	};
+	// 선곡 카드의 bucket: 여러 학기면 학기별, 한 학기면 월별. loadCards 가 정하고 '다시 시도'도 그대로 쓴다.
+	// (filter 는 $: 라 기간을 바꾼 직후에는 아직 이전 값이다. getJson 처럼 기간 변수를 바로 쓴다.)
+	const nextTimelineBucket = () =>
+		composerTimelineBucket({ period, start: customStart, end: customEnd }, current);
+	let timelineBucket = nextTimelineBucket();
 	// 독주자·지휘자 목록의 길이. 앞 학기의 목록도 같은 길이로 부른다(지난 학기 칸의 '10위 밖').
 	const LIMITS = { soloists: 10, conductors: 10 };
 	const cardRequests = {
 		summary: (id) => getJson('summary', id),
-		timeline: (id) => getJson('timeline', id, { bucket: 'semester' }),
+		timeline: (id) => getJson('timeline', id, { bucket: timelineBucket }),
 		works: (id) => getJson('works', id, { limit: String(WORKS_LIMIT) }),
 		soloists: (id) => getJson('soloists', id, { limit: String(LIMITS.soloists) }),
 		conductors: (id) => getJson('conductors', id, { limit: String(LIMITS.conductors) })
@@ -128,6 +133,7 @@
 		data = {};
 		errors = {};
 		appliedFilters = null;
+		timelineBucket = nextTimelineBucket();
 		loading = Object.fromEntries(CARD_KEYS.map((key) => [key, Boolean(id)]));
 		loadPreviousSummary();
 		if (!id) return;
@@ -278,9 +284,12 @@
 					.filter(Boolean)
 					.join(' · ')
 			: '';
-	$: timelineData = semesterSeries(timeline);
+	// 제목과 표의 머리글은 응답이 적용한 bucket 을 따른다(늦은 응답이 다른 이름으로 보이지 않게).
+	$: shownBucket = timeline?.filters?.bucket ?? timelineBucket;
+	$: timelineTitle = `${timelineBucketName(shownBucket)} 선곡`;
+	$: timelineData = timeline && timelineView(timeline);
 	$: timelineOpt =
-		timelineData && countBarOption(timelineData, '학기별 선곡', subtitleFor(timeline));
+		timelineData && countBarOption(timelineData, timelineTitle, subtitleFor(timeline));
 	$: soloistOpt =
 		soloists && horizontalBarOption(soloists, '많이 튼 독주자', subtitleFor(soloists));
 	$: conductorOpt =
@@ -308,9 +317,9 @@
 	// 독주자·지휘자는 이 작곡가의 곡을 그 사람과 튼 선곡 기록으로 간다(표의 이름, 차트의 막대).
 	$: soloistLinks = composerRankLinks(composerId, 'soloists', soloists, filter);
 	$: conductorLinks = composerRankLinks(composerId, 'conductors', conductors, filter);
-	// 학기는 그 학기에 이 작곡가의 곡을 튼 선곡 기록으로 간다(기간 밖의 날짜는 뺀다).
+	// 학기·달마다 그 학기·달에 이 작곡가의 곡을 튼 선곡 기록으로 간다(기간 밖의 날짜는 뺀다).
 	$: semesterLinks = composerSemesterLinks(composerId, timeline, semesters, filter);
-	// 막대의 dataIndex 는 뒤집힌 순서다(horizontalBarOption). 학기별 선곡은 뒤집지 않는다.
+	// 막대의 dataIndex 는 뒤집힌 순서다(horizontalBarOption). 학기별·월별 선곡은 뒤집지 않는다.
 	function openBar(links, e, reversed = true) {
 		const i = e.detail.dataIndex;
 		const href = links[reversed ? barItemIndex(i, links.length) : i];
@@ -454,7 +463,7 @@
 		{:else}
 			<div class="chart-grid">
 				<ChartCard
-					title="학기별 선곡"
+					title={timelineTitle}
 					option={timelineOpt}
 					data={timelineData}
 					loading={loading.timeline}
@@ -463,7 +472,7 @@
 					{fileTag}
 					links={semesterLinks}
 					on:itemclick={(e) => openBar(semesterLinks, e, false)}
-					csvHeaders={['학기', '횟수']}
+					csvHeaders={[shownBucket === 'semester' ? '학기' : '월', '횟수']}
 				/>
 				<!-- 곡은 처음·마지막 날짜까지 보이도록 차트 없이 표로만 -->
 				<section class="card works-card" tabindex="-1" aria-label="많이 튼 곡">

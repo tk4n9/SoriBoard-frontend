@@ -7,6 +7,7 @@ import { historyHref, bucketHistoryLinks, statHref } from './playHistory.js';
 import { DRILL_CARDS } from './statDrill.js';
 import { competitionRanks, formatCount } from './statTable.js';
 import { periodTitle } from './statTitle.js';
+import { spansSemesters } from './statBucket.js';
 
 const ID = /^[1-9]\d*$/;
 const UNKNOWN_ERA = '미상';
@@ -175,8 +176,8 @@ function composerHistoryFilter(
 	};
 }
 
-// 학기별 선곡의 학기마다 → 그 학기에 이 작곡가의 곡을 튼 선곡 기록(stats/timeline 의 학기 버킷).
-// 학기 목록에 있는 학기는 semester_id 로, 없으면 그 날짜로 연다. 기간이 학기의 일부만 덮으면
+// 학기별·월별 선곡의 막대마다 → 그 학기·달에 이 작곡가의 곡을 튼 선곡 기록(stats/timeline 의 학기·월 버킷).
+// 학기 목록에 있는 학기는 semester_id 로, 없으면(달도) 그 날짜로 연다. 기간이 학기·달의 일부만 덮으면
 // 응답의 filters 로 줄인 날짜로 연다(bucketHistoryLinks).
 /**
  * @param {number | string | null} id
@@ -215,11 +216,17 @@ export function composerFacts(composer) {
 	return `${era} · ${born}`;
 }
 
-// stats/timeline 의 학기 버킷 라벨('2025-1') → '2025-1학기'.
-/** @param {{ labels: string[], values: number[] } | null | undefined} timeline */
-export function semesterSeries(timeline) {
-	if (!timeline) return null;
-	return { labels: timeline.labels.map((label) => `${label}학기`), values: timeline.values };
+// 선곡 카드의 stats/timeline bucket: 기간이 여러 학기에 걸치면(전체 기간, 학기를 넘는 직접 지정) 학기별,
+// 한 학기 안이면(학기, 이번 학기, 한 학기 안의 직접 지정) 월별. 한 작곡가의 한 학기 선곡은 적어서 주별은 쓰지 않는다.
+/**
+ * @param {ComposerPeriod} filter
+ * @param {{ start: string, end: string }} current 이번 학기(end 가 오늘)
+ * @returns {'semester' | 'month'}
+ */
+export function composerTimelineBucket({ period, start = '', end = '' }, current) {
+	if (period === ALL) return 'semester';
+	if (period === CUSTOM && spansSemesters({ start, end }, current.end)) return 'semester';
+	return 'month';
 }
 
 // stats/works 는 곡을 '작곡가 - 곡' 으로 주므로, 이 작곡가의 곡이면 곡 이름만 남긴다.

@@ -16,7 +16,7 @@ import {
 	composerRankLinks,
 	composerSemesterLinks,
 	composerFacts,
-	semesterSeries,
+	composerTimelineBucket,
 	composerWorkName,
 	composerWorksTable,
 	composerWorksCsv
@@ -83,12 +83,19 @@ test('facts name the era and the birth year, or say they are unknown', () => {
 	assert.equal(composerFacts(null), '');
 });
 
-test('semester buckets read as 학기', () => {
-	assert.deepEqual(semesterSeries({ labels: ['2025-1', '2025-2'], values: [3, 4] }), {
-		labels: ['2025-1학기', '2025-2학기'],
-		values: [3, 4]
-	});
-	assert.equal(semesterSeries(null), null);
+test('the 선곡 card is 학기별 across several 학기 and 월별 inside one', () => {
+	const current = { start: '2026-09-01', end: '2026-10-31' };
+	const bucket = (filter) => composerTimelineBucket(filter, current);
+	assert.equal(bucket({ period: 'all' }), 'semester');
+	assert.equal(bucket({ period: 'custom', start: '2025-10-01', end: '2026-04-30' }), 'semester');
+	// 시작일이 비면 처음부터라 여러 학기다.
+	assert.equal(bucket({ period: 'custom', start: '', end: '2025-11-30' }), 'semester');
+	assert.equal(bucket({ period: '7' }), 'month');
+	assert.equal(bucket({ period: 'current' }), 'month');
+	assert.equal(bucket({ period: 'custom', start: '2025-10-01', end: '2025-11-30' }), 'month');
+	// 종료일이 비면 오늘(이번 학기의 끝)까지다.
+	assert.equal(bucket({ period: 'custom', start: '2026-09-15', end: '' }), 'month');
+	assert.equal(bucket({ period: 'custom', start: '2026-05-01', end: '' }), 'semester');
 });
 
 test("a work drops the composer's own name, matched by id", () => {
@@ -342,6 +349,33 @@ test('학기별 선곡 links clip to the period the answer applied', () => {
 	assert.deepEqual(composerSemesterLinks('4', whole, semesters, { period: '1' }), [
 		'/stat/history?semester_id=1&composer_id=4'
 	]);
+});
+
+test('월별 선곡 links open each month, clipped to the period the answer applied', () => {
+	const semesters = [{ id: 1, year: 2025, semester_num: 2 }];
+	const months = {
+		filters: { bucket: 'month', start: '2025-09-01', end: '2026-02-28' },
+		labels: ['2025-10']
+	};
+	assert.deepEqual(composerSemesterLinks('4', months, semesters, { period: '1' }), [
+		'/stat/history?start=2025-10-01&end=2025-10-31&composer_id=4'
+	]);
+	// 직접 지정 2025-10-15 ~ 2025-11-20: 처음과 끝 달은 그 범위로 줄인다.
+	const clipped = {
+		filters: { bucket: 'month', start: '2025-10-15', end: '2025-11-20' },
+		labels: ['2025-10', '2025-11']
+	};
+	assert.deepEqual(
+		composerSemesterLinks('4', clipped, semesters, {
+			period: 'custom',
+			start: '2025-10-15',
+			end: '2025-11-20'
+		}),
+		[
+			'/stat/history?start=2025-10-15&end=2025-10-31&composer_id=4',
+			'/stat/history?start=2025-11-01&end=2025-11-20&composer_id=4'
+		]
+	);
 });
 
 const NONE = { userId: null, includeMentees: false };
