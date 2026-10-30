@@ -18,9 +18,11 @@ import {
 	composerFacts,
 	semesterSeries,
 	composerWorkName,
-	composerWorksTable
+	composerWorksTable,
+	composerWorksCsv
 } from '../../src/lib/composerStats.js';
 import { readHistoryQuery, workHistoryHref } from '../../src/lib/playHistory.js';
+import { toCsvTable } from '../../src/lib/csvTable.js';
 
 test('the route id must be a positive integer', () => {
 	assert.equal(readComposerId('12'), '12');
@@ -136,6 +138,40 @@ test('the works table ranks ties together and shows each work’s first and last
 	]);
 	// 작곡가를 아직 모르면 이름을 그대로 쓴다.
 	assert.equal(composerWorksTable(works, null).rows[0][1], 'C - 가');
+});
+
+test('the works CSV has one row per work: name, count, first and last play, no rank', () => {
+	const works = {
+		items: [
+			{ name: 'C - 가', count: 1200, composer_id: 1 },
+			{
+				name: 'C - 나, "작품 2"',
+				count: 9,
+				composer_id: 1,
+				first_played: '2025-03-04',
+				last_played: '2026-10-01'
+			},
+			{ name: 'D - 다', count: 9, composer_id: 2, first_played: '2025-03-05', last_played: null }
+		]
+	};
+	const csv = composerWorksCsv(works, { id: 1, name: 'C' });
+	assert.deepEqual(csv.headers, ['곡', '횟수', '처음', '마지막']);
+	// 이 작곡가의 곡은 곡 이름만(표와 같다), 다른 작곡가의 곡은 그대로. 횟수는 숫자, 없는 날짜는 빈칸.
+	assert.deepEqual(csv.rows, [
+		['가', 1200, '', ''],
+		['나, "작품 2"', 9, '2025-03-04', '2026-10-01'],
+		['D - 다', 9, '2025-03-05', '']
+	]);
+	assert.equal(
+		toCsvTable(csv.headers, csv.rows),
+		'곡,횟수,처음,마지막\n가,1200,,\n"나, ""작품 2""",9,2025-03-04,2026-10-01\nD - 다,9,2025-03-05,'
+	);
+	// 작곡가를 아직 모르면 이름을 그대로 쓴다.
+	assert.deepEqual(
+		composerWorksCsv(works, null).rows.map((row) => row[0]),
+		['C - 가', 'C - 나, "작품 2"', 'D - 다']
+	);
+	assert.deepEqual(composerWorksCsv({ items: [] }, null).rows, []);
 });
 
 test('composerSemesterLinks opens each 학기 of 학기별 선곡 with this composer', () => {

@@ -9,7 +9,9 @@
 	import { rankTable, placeholderText } from '$lib/statTable.js';
 	import { WORKS_LIMIT, barItemIndex } from '$lib/statDrill.js';
 	import { pageTitle } from '$lib/statTitle.js';
-	import { memberFileText } from '$lib/statFileName.js';
+	import { memberFileText, downloadName } from '$lib/statFileName.js';
+	import { todayStamp } from '$lib/csv.js';
+	import { downloadCsvTable } from '$lib/csvTable.js';
 	import { ALL, CURRENT, CUSTOM, periodRangeText, currentSemesterRange } from '$lib/statPeriod.js';
 	import { semesterRangeOf } from '$lib/statBucket.js';
 	import {
@@ -28,7 +30,8 @@
 		composerSemesterLinks,
 		composerFacts,
 		semesterSeries,
-		composerWorksTable
+		composerWorksTable,
+		composerWorksCsv
 	} from '$lib/composerStats.js';
 
 	// 작곡가 한 명의 기록, 고른 기간·지기만(기본값은 전체 기간·전체 지기). 카드는 따로 불러오고,
@@ -226,6 +229,17 @@
 	$: conductorOpt =
 		conductors && horizontalBarOption(conductors, '많이 튼 지휘자', subtitleFor(conductors));
 	$: worksTable = works && works.items.length > 0 && composerWorksTable(works, composer);
+	// 많이 튼 곡의 CSV 저장: 차트 카드(ChartCard)처럼, 표가 보일 때만 그 곡들을 받는다.
+	$: canExportWorks = Boolean(worksTable) && !loading.works && !errors.works;
+	function exportWorksCsv() {
+		if (!canExportWorks) return;
+		const csv = composerWorksCsv(works, composer);
+		downloadCsvTable(
+			downloadName(['통계', '많이 튼 곡', fileTag, todayStamp()], 'csv'),
+			csv.headers,
+			csv.rows
+		);
+	}
 	// 링크는 모두 같은 기간·지기를 연다. 곡 이름은 그 곡의 선곡 기록으로 간다.
 	$: worksLinks = works ? works.items.map((item) => composerWorkHref(item.id, filter)) : [];
 	// 독주자·지휘자는 이 작곡가의 곡을 그 사람과 튼 선곡 기록으로 간다(표의 이름, 차트의 막대).
@@ -355,7 +369,18 @@
 					csvHeaders={['학기', '횟수']}
 				/>
 				<!-- 곡은 처음·마지막 날짜까지 보이도록 차트 없이 표로만 -->
-				<section class="card" tabindex="-1" aria-label="많이 튼 곡">
+				<section class="card works-card" tabindex="-1" aria-label="많이 튼 곡">
+					<div class="toolbar">
+						<button
+							class="tool-btn"
+							on:click={exportWorksCsv}
+							disabled={!canExportWorks}
+							title="데이터(CSV)로 저장"
+							aria-label="많이 튼 곡 CSV 저장"
+						>
+							CSV 저장
+						</button>
+					</div>
 					{#if loading.works || errors.works || !worksTable}
 						<!-- 표가 없으면 제목도 없으므로, 차트 카드처럼 어느 카드인지 여기서 밝힌다. -->
 						<div class="placeholder" class:error={!loading.works && errors.works}>
@@ -519,8 +544,14 @@
 		padding: 3px 8px;
 		cursor: pointer;
 	}
-	.tool-btn:hover {
+	.tool-btn:hover:not(:disabled) {
 		background: var(--secondary-secondary-200, #fdf1e4);
+	}
+	.tool-btn:disabled {
+		color: var(--gray-gray-500);
+		border-color: var(--gray-gray-400);
+		background: var(--secondary-secondary-50);
+		cursor: default;
 	}
 	.kpi-error .tool-btn {
 		margin-left: 8px;
@@ -538,6 +569,19 @@
 		box-shadow: 4px 4px 5px 0px rgba(0, 0, 0, 0.08);
 		padding: 12px;
 		min-width: 0;
+	}
+	/* 많이 튼 곡의 CSV 저장은 ChartCard 의 저장 단추처럼 오른쪽 위에 */
+	.works-card {
+		position: relative;
+	}
+	.toolbar {
+		display: flex;
+		justify-content: flex-end;
+		gap: 6px;
+		position: absolute;
+		top: 12px;
+		right: 12px;
+		z-index: 2;
 	}
 	.placeholder {
 		display: flex;

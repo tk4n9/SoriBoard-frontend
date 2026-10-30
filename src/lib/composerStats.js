@@ -262,3 +262,23 @@ export function composerWorksTable(works, composer) {
 		])
 	};
 }
+
+// 곡 표의 CSV(csvTable.js): 곡, 횟수, 처음, 마지막. 순위는 빼고(차트 카드의 CSV 처럼) 횟수는 숫자 그대로,
+// 날짜는 YYYY-MM-DD, 없으면 빈칸.
+/**
+ * @param {{ items: { name: string, count: number, composer_id?: number | null,
+ *   first_played?: string | null, last_played?: string | null }[] }} works
+ * @param {{ id: number, name: string } | null} composer
+ * @returns {{ headers: string[], rows: unknown[][] }}
+ */
+export function composerWorksCsv(works, composer) {
+	return {
+		headers: ['곡', '횟수', '처음', '마지막'],
+		rows: works.items.map((item) => [
+			composer ? composerWorkName(item, composer) : item.name,
+			item.count,
+			item.first_played ?? '',
+			item.last_played ?? ''
+		])
+	};
+}
