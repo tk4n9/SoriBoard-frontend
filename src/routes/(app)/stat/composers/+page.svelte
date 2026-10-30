@@ -66,6 +66,20 @@
 	}
 	onMount(load);
 
+	// '다시 시도'는 누르면 '불러오는 중...'이나 이전 표로 바뀌어 사라지므로, 먼저 목록 카드로 포커스를
+	// 옮긴다. 또 실패했는데 포커스가 아직 카드에 있으면 새 '다시 시도'로 되돌린다.
+	/** @type {HTMLElement} */
+	let listCard;
+	async function retryList(e) {
+		const hadFocus = document.activeElement === e.currentTarget;
+		if (hadFocus) listCard?.focus();
+		await load();
+		if (!hadFocus || !error) return;
+		await tick();
+		if (document.activeElement === listCard)
+			listCard.querySelector('.placeholder.error button')?.focus();
+	}
+
 	function onSearch() {
 		q = query.trim();
 		query = q;
@@ -210,13 +224,15 @@
 		</div>
 		<p class="status" aria-live="polite">{status}</p>
 
-		<section class="card" aria-label="작곡가 목록">
+		<section class="card" aria-label="작곡가 목록" tabindex="-1" bind:this={listCard}>
 			{#if loading && !loaded}
 				<div class="placeholder">불러오는 중...</div>
 			{:else if error}
 				<div class="placeholder error">
 					{error}
-					<button class="tool-btn" on:click={load}>다시 시도</button>
+					<button class="tool-btn" on:click={retryList} aria-label="작곡가 목록 다시 시도"
+						>다시 시도</button
+					>
 				</div>
 			{:else if loaded && composers.length === 0}
 				<div class="placeholder">{q ? `'${q}'에 맞는 작곡가가 없습니다` : '작곡가가 없습니다'}</div>

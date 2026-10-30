@@ -110,6 +110,18 @@
 		(row?.querySelector('a') ?? moreBar?.querySelector('button'))?.focus();
 	}
 
+	// 목록의 '다시 시도'도 누르면 '불러오는 중...'으로 바뀌어 사라지므로, 먼저 목록 카드로 포커스를 옮긴다.
+	// 또 실패했는데 포커스가 아직 카드에 있으면 새 '다시 시도'로 되돌린다.
+	async function retryList(e) {
+		const hadFocus = document.activeElement === e.currentTarget;
+		if (hadFocus) listCard?.focus();
+		if (!(await load())) return;
+		if (!hadFocus || !error) return;
+		await tick();
+		if (document.activeElement === listCard)
+			listCard.querySelector('.placeholder.error button')?.focus();
+	}
+
 	// 필터가 바뀌면 URL을 바꾸고(히스토리를 쌓지 않고, 포커스·스크롤도 그대로) 처음부터 다시 부른다.
 	function apply() {
 		goto(historyHref(filter()), { replaceState: true, keepFocus: true, noScroll: true });
@@ -351,7 +363,7 @@
 		</div>
 	</div>
 
-	<section class="card" aria-label="선곡 목록" bind:this={listCard}>
+	<section class="card" aria-label="선곡 목록" tabindex="-1" bind:this={listCard}>
 		{#if rows.length > 0}
 			<PlayTable {rows} />
 		{:else if loading}
@@ -359,7 +371,9 @@
 		{:else if error}
 			<div class="placeholder error">
 				{error}
-				<button class="tool-btn" on:click={() => load()}>다시 시도</button>
+				<button class="tool-btn" on:click={retryList} aria-label="선곡 목록 다시 시도"
+					>다시 시도</button
+				>
 			</div>
 		{:else if count === 0}
 			<div class="placeholder">조건에 맞는 선곡이 없습니다</div>

@@ -1,5 +1,5 @@
 <script>
-	import { createEventDispatcher } from 'svelte';
+	import { createEventDispatcher, tick } from 'svelte';
 	import {
 		SPELLING_KINDS,
 		duplicatesSearch,
@@ -44,6 +44,19 @@
 
 	$: load(kind);
 
+	// '다시 시도'는 누르면 '불러오는 중...'이나 표로 바뀌어 사라지므로, 먼저 카드로 포커스를 옮긴다.
+	// 또 실패했는데 포커스가 아직 카드에 있으면 새 '다시 시도'로 되돌린다.
+	/** @type {HTMLElement} */
+	let card;
+	async function retryList(e) {
+		const hadFocus = document.activeElement === e.currentTarget;
+		if (hadFocus) card?.focus();
+		await load(kind);
+		if (!hadFocus || !error) return;
+		await tick();
+		if (document.activeElement === card) card.querySelector('.placeholder.error button')?.focus();
+	}
+
 	function onKindChange() {
 		dispatch('change', kind);
 	}
@@ -73,11 +86,13 @@
 	</p>
 </div>
 
-<section class="card" aria-label="표기 정리">
+<section class="card" aria-label="표기 정리" tabindex="-1" bind:this={card}>
 	{#if error}
 		<div class="placeholder error">
 			{error}
-			<button class="tool-btn" on:click={() => load(kind)}>다시 시도</button>
+			<button class="tool-btn" on:click={retryList} aria-label="표기 정리 다시 시도"
+				>다시 시도</button
+			>
 		</div>
 	{:else if !spec}
 		<div class="placeholder">불러오는 중...</div>
