@@ -1,6 +1,7 @@
-// 작곡가 페이지(/stat/composer/<id>): 경로의 id, 기간과 URL, 머리말 문구, 학기 라벨, 곡 표, 링크.
+// 작곡가 페이지(/stat/composer/<id>): 경로의 id, 기간·지기와 URL, 머리말 문구, 학기 라벨, 곡 표, 링크.
 // 기간은 통계와 같은 키(statPeriod.js)로 URL에 두지만, 기본값이 전체 기간이다: 전체 기간은
-// 아무것도 남기지 않고, 이번 학기는 period=current 로 남긴다. 링크는 모두 그 기간을 연다.
+// 아무것도 남기지 않고, 이번 학기는 period=current 로 남긴다. 지기는 선곡 기록과 같은 키
+// (user_id, include_mentees)로 두고, 기본값(전체 지기)은 남기지 않는다. 링크는 모두 그 기간·지기를 연다.
 import { CURRENT, ALL, CUSTOM, readStatPeriod, readStatRange } from './statPeriod.js';
 import { historyHref, bucketHistoryLinks, statHref } from './playHistory.js';
 import { DRILL_CARDS } from './statDrill.js';
@@ -16,10 +17,14 @@ export function readComposerId(raw) {
 	return raw && ID.test(raw) && Number.isSafeInteger(Number(raw)) ? raw : null;
 }
 
-/** @typedef {{ period: string, start?: string, end?: string }} ComposerPeriod */
+/**
+ * @typedef {{ period: string, start?: string, end?: string, userId?: string | null,
+ *   includeMentees?: boolean }} ComposerPeriod
+ */
 /** @type {ComposerPeriod} */
 const WHOLE = { period: ALL, start: '', end: '' };
 const PERIOD_KEYS = ['semester_id', 'period', 'start', 'end'];
+const MEMBER_KEYS = ['user_id', 'include_mentees'];
 
 // URL의 기간. 학기, 직접 지정, period=current(이번 학기) 순으로 따르고, 없거나 형식이 틀리면 전체 기간.
 /**
@@ -48,13 +53,36 @@ export function writeComposerPeriod(params, { period, start = '', end = '' } = W
 	} else if (period !== ALL) params.set('semester_id', String(period));
 }
 
+// URL의 지기. 없거나 형식이 틀리면 전체 지기(null). 견습 포함은 지기를 고른 때만 뜻이 있다(선곡 기록과 같다).
+/**
+ * @param {URLSearchParams} params
+ * @returns {{ userId: string | null, includeMentees: boolean }}
+ */
+export function readComposerMember(params) {
+	const userId = readComposerId(params.get('user_id'));
+	return { userId, includeMentees: userId !== null && params.get('include_mentees') === 'true' };
+}
+
+// params 의 지기 키만 filter 에 맞춘다(다른 키는 그대로). 전체 지기는 아무것도 남기지 않는다.
+/**
+ * @param {URLSearchParams} params
+ * @param {{ userId?: string | null, includeMentees?: boolean }} [filter]
+ */
+export function writeComposerMember(params, { userId = null, includeMentees = false } = {}) {
+	for (const key of MEMBER_KEYS) params.delete(key);
+	if (!userId) return;
+	params.set('user_id', String(userId));
+	if (includeMentees) params.set('include_mentees', 'true');
+}
+
 /**
  * @param {number | string} id
- * @param {ComposerPeriod} [filter] 없으면 전체 기간
+ * @param {ComposerPeriod} [filter] 없으면 전체 기간·전체 지기
  */
 export function composerHref(id, filter = WHOLE) {
 	const params = new URLSearchParams();
 	writeComposerPeriod(params, filter);
+	writeComposerMember(params, filter);
 	const search = params.toString();
 	return `/stat/composer/${id}${search ? `?${search}` : ''}`;
 }
@@ -75,6 +103,18 @@ export function composerPeriodParams({ period, start = '', end = '' }, current) 
 	return params;
 }
 
+// stats/ 요청의 지기 파라미터(통계의 개인 보기와 같다). 전체 지기면 {}.
+/**
+ * @param {{ userId?: string | null, includeMentees?: boolean }} filter
+ * @returns {Record<string, string>}
+ */
+export function composerMemberParams({ userId = null, includeMentees = false }) {
+	if (!userId) return {};
+	return includeMentees
+		? { user_id: String(userId), include_mentees: 'true' }
+		: { user_id: String(userId) };
+}
+
 // 카드 부제와 탭 제목에 넣을 기간의 이름. 학기가 목록에 아직 없으면 ''.
 /**
  * @param {ComposerPeriod} filter
@@ -84,12 +124,12 @@ export function composerPeriodName(filter, semesters) {
 	return filter.period === CURRENT ? '이번 학기' : periodTitle(filter, semesters);
 }
 
-// 같은 기간의 통계(전체 기간이면 period=all).
+// 같은 기간의 통계(전체 기간이면 period=all). 지기를 고르면 그 지기의 개인 보기.
 /** @param {ComposerPeriod} [filter] */
 export const composerStatHref = (filter = WHOLE) =>
 	statHref(composerHistoryFilter(null, [], filter));
 
-// 이 작곡가의 선곡 기록(filter 의 기간, 없으면 전체 기간). extra 를 주면 그 대상(예: 연주자)과 함께 튼 것만.
+// 이 작곡가의 선곡 기록(filter 의 기간·지기, 없으면 전체 기간·전체 지기). extra 를 주면 그 대상(예: 연주자)과 함께 튼 것만.
 /**
  * @param {number | string} id
  * @param {import('./playHistory.js').HistoryTarget[]} [extra]
@@ -99,7 +139,7 @@ export function composerHistoryHref(id, extra = [], filter = WHOLE) {
 	return historyHref(composerHistoryFilter(id, extra, filter));
 }
 
-// 곡 하나의 선곡 기록(같은 기간). 곡의 작곡가는 하나뿐이므로 곡만 거른다.
+// 곡 하나의 선곡 기록(같은 기간·지기). 곡의 작곡가는 하나뿐이므로 곡만 거른다.
 /**
  * @param {number | string} musicId
  * @param {ComposerPeriod} [filter]
@@ -117,15 +157,19 @@ export function composerWorkHref(musicId, filter = WHOLE) {
  * @param {ComposerPeriod} [filter]
  * @returns {import('./playHistory.js').HistoryFilter}
  */
-function composerHistoryFilter(id, extra = [], { period, start = '', end = '' } = WHOLE) {
+function composerHistoryFilter(
+	id,
+	extra = [],
+	{ period, start = '', end = '', userId = null, includeMentees = false } = WHOLE
+) {
 	const custom = period === CUSTOM;
 	return {
 		period,
 		start: custom ? start : '',
 		end: custom ? end : '',
 		q: '',
-		userId: null,
-		includeMentees: false,
+		userId: userId || null,
+		includeMentees: Boolean(userId) && includeMentees,
 		requested: '',
 		targets: [...(id == null ? [] : [{ param: 'composer_id', id: String(id) }]), ...extra]
 	};

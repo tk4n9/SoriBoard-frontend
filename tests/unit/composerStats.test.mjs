@@ -4,8 +4,11 @@ import {
 	readComposerId,
 	readComposerPeriod,
 	writeComposerPeriod,
+	readComposerMember,
+	writeComposerMember,
 	composerHref,
 	composerPeriodParams,
+	composerMemberParams,
 	composerPeriodName,
 	composerStatHref,
 	composerWorkHref,
@@ -303,4 +306,133 @@ test('학기별 선곡 links clip to the period the answer applied', () => {
 	assert.deepEqual(composerSemesterLinks('4', whole, semesters, { period: '1' }), [
 		'/stat/history?semester_id=1&composer_id=4'
 	]);
+});
+
+const NONE = { userId: null, includeMentees: false };
+const MEMBER = { period: '7', userId: '12', includeMentees: false };
+const MENTEES = { period: '7', userId: '12', includeMentees: true };
+
+test('the 지기 reads from user_id and include_mentees, and defaults to 전체 지기', () => {
+	assert.deepEqual(readComposerMember(query('user_id=12&include_mentees=true')), {
+		userId: '12',
+		includeMentees: true
+	});
+	assert.deepEqual(readComposerMember(query('semester_id=7&user_id=12')), {
+		userId: '12',
+		includeMentees: false
+	});
+	assert.deepEqual(readComposerMember(query('user_id=12&include_mentees=1')), {
+		userId: '12',
+		includeMentees: false
+	});
+	// 견습 포함은 지기를 고른 때만 뜻이 있다.
+	for (const bad of [
+		'',
+		'include_mentees=true',
+		'user_id=0&include_mentees=true',
+		'user_id=abc',
+		'user_id=1.5',
+		'user_id=-3',
+		'user_id='
+	]) {
+		assert.deepEqual(readComposerMember(query(bad)), NONE, bad);
+	}
+});
+
+test('writing the 지기 round-trips, keeps other keys, and 전체 지기 writes nothing', () => {
+	for (const member of [
+		NONE,
+		{ userId: '12', includeMentees: false },
+		{ userId: '12', includeMentees: true }
+	]) {
+		const params = query('');
+		writeComposerMember(params, member);
+		assert.deepEqual(readComposerMember(params), member, params.toString());
+	}
+	const params = query('semester_id=7&user_id=3&include_mentees=true');
+	writeComposerMember(params, { userId: '12', includeMentees: false });
+	assert.equal(params.toString(), 'semester_id=7&user_id=12');
+	writeComposerMember(params, NONE);
+	assert.equal(params.toString(), 'semester_id=7');
+	// 견습 포함만으로는 아무것도 남기지 않는다.
+	writeComposerMember(params, { userId: null, includeMentees: true });
+	assert.equal(params.toString(), 'semester_id=7');
+	writeComposerMember(params);
+	assert.equal(params.toString(), 'semester_id=7');
+});
+
+test('composerHref adds the 지기 after the period', () => {
+	assert.equal(
+		composerHref(5, { period: '7', userId: '12', includeMentees: true }),
+		'/stat/composer/5?semester_id=7&user_id=12&include_mentees=true'
+	);
+	assert.equal(composerHref(5, MEMBER), '/stat/composer/5?semester_id=7&user_id=12');
+	assert.equal(composerHref(5, { period: 'all', userId: '12' }), '/stat/composer/5?user_id=12');
+	// 전체 지기면 오늘의 URL 그대로(통계의 전체 보기가 넘기는 값).
+	assert.equal(
+		composerHref(5, { period: '7', userId: null, includeMentees: true }),
+		'/stat/composer/5?semester_id=7'
+	);
+	const read = new URL(
+		composerHref(5, { ...RANGE, userId: '12', includeMentees: true }),
+		'http://x'
+	).searchParams;
+	assert.deepEqual(readComposerPeriod(read), RANGE);
+	assert.deepEqual(readComposerMember(read), { userId: '12', includeMentees: true });
+});
+
+test('the request sends user_id, and include_mentees only with a 지기', () => {
+	assert.deepEqual(composerMemberParams(NONE), {});
+	assert.deepEqual(composerMemberParams({}), {});
+	assert.deepEqual(composerMemberParams({ userId: null, includeMentees: true }), {});
+	assert.deepEqual(composerMemberParams(MEMBER), { user_id: '12' });
+	assert.deepEqual(composerMemberParams(MENTEES), { user_id: '12', include_mentees: 'true' });
+});
+
+test('links keep the 지기: 통계 opens its 개인 view, 선곡 기록 opens with that 지기', () => {
+	assert.equal(composerStatHref(MEMBER), '/stat?semester_id=7&scope=individual&user_id=12');
+	assert.equal(
+		composerStatHref(MENTEES),
+		'/stat?semester_id=7&scope=individual&user_id=12&include_mentees=true'
+	);
+	assert.equal(
+		composerStatHref({ period: 'all', userId: '12' }),
+		'/stat?period=all&scope=individual&user_id=12'
+	);
+
+	assert.equal(
+		composerHistoryHref(7, [], MENTEES),
+		'/stat/history?semester_id=7&user_id=12&include_mentees=true&composer_id=7'
+	);
+	const read = readHistoryQuery(
+		new URL(composerHistoryHref(7, [], MENTEES), 'http://x').searchParams
+	);
+	assert.equal(read.userId, '12');
+	assert.equal(read.includeMentees, true);
+	assert.deepEqual(read.targets, [{ param: 'composer_id', id: '7' }]);
+
+	assert.equal(composerWorkHref(11, MEMBER), '/stat/history?semester_id=7&user_id=12&music_id=11');
+	assert.deepEqual(composerRankLinks(7, 'soloists', { items: [{ id: 2, name: 'a' }] }, MENTEES), [
+		'/stat/history?semester_id=7&user_id=12&include_mentees=true&composer_id=7&player_id=2'
+	]);
+	assert.deepEqual(composerRankLinks(7, 'conductors', { items: [{ id: 5, name: 'b' }] }, MEMBER), [
+		'/stat/history?semester_id=7&user_id=12&composer_id=7&conductor_id=5'
+	]);
+
+	const timeline = {
+		filters: { bucket: 'semester', user_id: 12 },
+		labels: ['2024-1', '2025-2']
+	};
+	const semesters = [{ id: 1, year: 2025, semester_num: 2 }];
+	assert.deepEqual(composerSemesterLinks('4', timeline, semesters, { ...MENTEES, period: 'all' }), [
+		'/stat/history?start=2024-03-01&end=2024-08-31&user_id=12&include_mentees=true&composer_id=4',
+		'/stat/history?semester_id=1&user_id=12&include_mentees=true&composer_id=4'
+	]);
+});
+
+test('견습 포함 without a 지기 does not reach any link', () => {
+	const stray = { period: '7', userId: null, includeMentees: true };
+	assert.equal(composerStatHref(stray), '/stat?semester_id=7');
+	assert.equal(composerHistoryHref(7, [], stray), '/stat/history?semester_id=7&composer_id=7');
+	assert.equal(composerWorkHref(11, stray), '/stat/history?semester_id=7&music_id=11');
 });
