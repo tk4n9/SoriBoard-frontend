@@ -669,10 +669,13 @@
 		gap: 12px 16px;
 		margin-bottom: 20px;
 	}
+	/* 이름이 길면 낱말·링크를 쪼개지 않고 통째로 다음 줄로 넘긴다 */
 	.title-group {
 		display: flex;
+		flex-wrap: wrap;
 		align-items: baseline;
 		gap: 12px;
+		row-gap: 4px;
 	}
 	h1 {
 		font-family: var(--xlarge-font-family, 'Noto Sans KR', sans-serif);
@@ -680,11 +683,13 @@
 		font-weight: var(--xlarge-font-weight, 500);
 		color: var(--gray-gray-950, #1a1a1a);
 		margin: 0;
+		word-break: keep-all;
 	}
 	.facts {
 		font-family: var(--small-medium-font-family, 'Noto Sans KR', sans-serif);
 		font-size: var(--small-medium-font-size, 13px);
 		color: var(--gray-gray-600, #7c7c7c);
+		white-space: nowrap;
 	}
 	.controls {
 		display: flex;
@@ -705,6 +710,7 @@
 		font-size: var(--small-medium-font-size, 13px);
 		color: var(--primary-primary-800, #6a5134);
 		text-underline-offset: 3px;
+		white-space: nowrap;
 	}
 	.empty-hint {
 		text-align: center;
