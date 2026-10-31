@@ -30,6 +30,7 @@
 
 	const dispatch = createEventDispatcher();
 	let panel;
+	let actionsWidth = 0; // 오른쪽 위 단추 줄의 너비(보이는 단추에 따라 바뀐다)
 
 	// 열리면(대상마다 새로 만든다) 패널로 포커스를 옮긴다. 그리드 아래라 화면 밖일 수 있으므로
 	// 패널이 보일 만큼만 부드럽게 스크롤한다.
@@ -72,8 +73,9 @@
 	tabindex="-1"
 	bind:this={panel}
 	use:closeOnEscape={() => dispatch('close')}
+	style:--actions-width={`${actionsWidth}px`}
 >
-	<div class="actions">
+	<div class="actions" bind:offsetWidth={actionsWidth}>
 		{#if composerLink}
 			<a class="history-link" href={composerLink}>작곡가 페이지</a>
 		{/if}
@@ -185,6 +187,11 @@
 		font-size: 18px;
 		font-weight: 700;
 		color: var(--gray-gray-950, #1a1a1a);
+	}
+	/* 오른쪽 위의 단추와 겹치지 않도록, 가운데를 지킨 채 양쪽을 단추 줄 너비만큼 비운다(긴 이름은 줄을 바꾼다). */
+	.drill-panel :global(.table-title),
+	.panel-title {
+		padding: 0 calc(var(--actions-width, 0px) + 12px);
 	}
 	.panel-subtitle {
 		margin-top: 4px;
