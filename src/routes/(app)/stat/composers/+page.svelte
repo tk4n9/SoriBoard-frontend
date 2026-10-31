@@ -3,6 +3,7 @@
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import { composerHref } from '$lib/composerStats.js';
+	import { targetHistoryHref } from '$lib/playHistory.js';
 	import {
 		ERAS,
 		UNKNOWN_ERA,
@@ -298,7 +299,19 @@
 											<div id="year-error" class="field-error">{yearError}</div>
 										{/if}
 									</td>
-									<td class="num">{composer.num_time_music.toLocaleString()}</td>
+									<td class="num">
+										{#if composer.num_time_music > 0}
+											<a
+												class="count"
+												href={targetHistoryHref('composer_id', composer.id)}
+												title="선곡 기록에서 보기"
+												aria-label={`${composer.name} 선곡 ${composer.num_time_music.toLocaleString()}곡 선곡 기록에서 보기`}
+												>{composer.num_time_music.toLocaleString()}</a
+											>
+										{:else}
+											{composer.num_time_music.toLocaleString()}
+										{/if}
+									</td>
 									<td class="actions">
 										<div class="buttons">
 											<button
@@ -321,7 +334,19 @@
 										{#if cell.note}<span class="era-note">{cell.note}</span>{/if}
 									</td>
 									<td class:unknown={composer.birth_year == null}>{composer.birth_year ?? '—'}</td>
-									<td class="num">{composer.num_time_music.toLocaleString()}</td>
+									<td class="num">
+										{#if composer.num_time_music > 0}
+											<a
+												class="count"
+												href={targetHistoryHref('composer_id', composer.id)}
+												title="선곡 기록에서 보기"
+												aria-label={`${composer.name} 선곡 ${composer.num_time_music.toLocaleString()}곡 선곡 기록에서 보기`}
+												>{composer.num_time_music.toLocaleString()}</a
+											>
+										{:else}
+											{composer.num_time_music.toLocaleString()}
+										{/if}
+									</td>
 									<td class="actions">
 										<button
 											class="tool-btn"
@@ -537,6 +562,16 @@
 	.num {
 		text-align: right;
 		font-variant-numeric: tabular-nums;
+	}
+	/* 통계의 숫자 링크처럼 밑줄은 가리키거나 키보드로 고를 때만 */
+	.count {
+		color: inherit;
+		text-decoration: none;
+		text-underline-offset: 3px;
+	}
+	.count:hover,
+	.count:focus-visible {
+		text-decoration: underline;
 	}
 	td.unknown {
 		color: var(--gray-gray-500, #9f9f9f);

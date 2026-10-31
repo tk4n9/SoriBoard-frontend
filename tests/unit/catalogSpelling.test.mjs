@@ -50,7 +50,8 @@ test('the request names the kind', () => {
 test('rows link by id: composers to their page, others to their plays of all time', () => {
 	assert.deepEqual(rowLinks('composer', { id: 7, name: 'A', count: 1 }), {
 		name: '/stat/composer/7',
-		composer: null
+		composer: null,
+		count: '/stat/history?period=all&composer_id=7'
 	});
 	for (const [kind, param] of [
 		['player', 'player_id'],
@@ -72,12 +73,33 @@ test('rows link by id: composers to their page, others to their plays of all tim
 test('a work links its plays and its composer', () => {
 	const work = { id: 4, name: '교향곡 Op. 67', count: 2, composer_id: 9, composer_name: '가' };
 	const plays = '/stat/history?period=all&music_id=4';
-	assert.deepEqual(rowLinks('music', work), { name: plays, composer: '/stat/composer/9' });
+	assert.deepEqual(rowLinks('music', work), {
+		name: plays,
+		composer: '/stat/composer/9',
+		count: null
+	});
 	assert.deepEqual(rowLinks('music', { ...work, composer_id: null }), {
 		name: plays,
-		composer: null
+		composer: null,
+		count: null
 	});
-	assert.deepEqual(rowLinks('unknown', work), { name: null, composer: null });
+	assert.deepEqual(rowLinks('unknown', work), { name: null, composer: null, count: null });
+});
+
+test("a composer spelling's play count links its plays of all time, unless it has none", () => {
+	const url = urlOf(rowLinks('composer', { id: 7, name: 'J. S. Bach', count: 3 }).count);
+	assert.equal(url.href, 'http://x/stat/history?period=all&composer_id=7');
+	const filter = readHistoryQuery(url.searchParams);
+	assert.equal(filter.period, 'all');
+	assert.deepEqual(filter.targets, [{ param: 'composer_id', id: '7' }]);
+	assert.equal(filter.q, '');
+	assert.equal(filter.userId, null);
+	assert.equal(filter.requested, '');
+	for (const key of ['q', 'user_id', 'requested']) assert.equal(url.searchParams.has(key), false);
+	assert.equal(rowLinks('composer', { id: 7, name: 'J. S. Bach', count: 0 }).count, null);
+	for (const kind of ['player', 'conductor', 'orchestra', 'music']) {
+		assert.equal(rowLinks(kind, { id: 12, name: '같은 이름', count: 3 }).count, null, kind);
+	}
 });
 
 test('a group is headed by its most played spelling, with its spellings and plays', () => {

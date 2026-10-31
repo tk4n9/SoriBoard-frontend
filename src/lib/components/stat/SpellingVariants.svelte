@@ -138,7 +138,19 @@
 									{/if}
 								</td>
 							{/if}
-							<td class="num">{row.count.toLocaleString()}</td>
+							<td class="num">
+								{#if links.count}
+									<a
+										class="count"
+										href={links.count}
+										title="선곡 기록에서 보기"
+										aria-label={`${row.name} 선곡 ${row.count.toLocaleString()}곡 선곡 기록에서 보기`}
+										>{row.count.toLocaleString()}</a
+									>
+								{:else}
+									{row.count.toLocaleString()}
+								{/if}
+							</td>
 							<td class="id">#{row.id}</td>
 						</tr>
 					{/each}
@@ -274,6 +286,14 @@
 	}
 	tbody a:hover {
 		text-decoration-thickness: 2px;
+	}
+	/* 선곡 수 링크: 통계의 숫자 링크처럼 밑줄은 가리키거나 키보드로 고를 때만 */
+	tbody a.count {
+		text-decoration: none;
+	}
+	tbody a.count:hover,
+	tbody a.count:focus-visible {
+		text-decoration: underline;
 	}
 	.num {
 		text-align: right;
