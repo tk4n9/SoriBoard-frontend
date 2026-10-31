@@ -7,6 +7,7 @@
 	import MemberSelect from '$lib/components/stat/MemberSelect.svelte';
 	import PeriodSelect from '$lib/components/stat/PeriodSelect.svelte';
 	import DrillPanel from '$lib/components/stat/DrillPanel.svelte';
+	import TableCard from '$lib/components/stat/TableCard.svelte';
 	import {
 		horizontalBarOption,
 		timelineOption,
@@ -60,8 +61,10 @@
 		kpiChangeText,
 		evennessChangeText,
 		mixTable,
-		rankChangeTable
+		rankChangeTable,
+		firstsTable
 	} from '$lib/semesterReport.js';
+	import { hasPeriodStart, firstsSubtitle } from '$lib/statFirsts.js';
 	import { memberFileText } from '$lib/statFileName.js';
 	import { pageTitle, periodTitle } from '$lib/statTitle.js';
 
@@ -147,8 +150,13 @@
 		timeline: () => getJson('timeline', { bucket: timelineBucket }),
 		eras: () => getJson('eras'),
 		diversity: () => getJson('diversity', { bucket: diversityBucket }),
-		works: () => getJson('works', { limit: LIMITS.works })
+		works: () => getJson('works', { limit: LIMITS.works }),
+		// 시작이 없는 기간이면 firsts 는 지금까지 튼 모든 것을 주므로 부르지 않는다(null, statFirsts.js).
+		firstComposers: () => (hasFirsts() ? getJson('firsts', { kind: 'composer' }) : null),
+		firstWorks: () => (hasFirsts() ? getJson('firsts', { kind: 'work' }) : null)
 	};
+	const hasFirsts = () =>
+		hasPeriodStart({ period, start: period === CUSTOM ? customStart : startDate });
 	// 다른 카드의 응답에서 꺼내 그리는 카드.
 	const pickCard = { genres: genreDistribution, diversityTiles };
 	const CARD_KEYS = [...Object.keys(cardRequests), ...Object.keys(pickCard)];
@@ -195,6 +203,8 @@
 				const latest = () => cards.filter((key) => requests.isLatest(key, id));
 				try {
 					const result = await cardRequests[request]();
+					// 부르지 않은 카드(null)는 비운 채로 둔다.
+					if (result == null) return;
 					for (const key of latest()) {
 						data[key] = pickCard[key] ? pickCard[key](result) : result;
 						// 모든 통계 응답이 적용된 기간(filters)을 돌려준다.
@@ -592,6 +602,26 @@
 		const href = worksLinks[barItemIndex(e.detail.dataIndex, worksLinks.length)];
 		if (href) goto(href);
 	}
+	// 처음 튼 작곡가·곡: 이름은 같은 기간·지기의 작곡가 페이지와, 그 곡의 선곡 기록을 연다.
+	$: firstsAsked = hasPeriodStart({ period, start: period === CUSTOM ? customStart : startDate });
+	$: firstComposers = data.firstComposers;
+	$: firstWorks = data.firstWorks;
+	$: firstComposerLinks = firstComposers
+		? firstComposers.items.map((item) =>
+				composerHref(item.id, {
+					period,
+					start: customStart,
+					end: customEnd,
+					userId: scope === 'individual' ? userId : null,
+					includeMentees
+				})
+			)
+		: [];
+	$: firstWorkLinks = firstWorks
+		? firstWorks.items.map((item) =>
+				historyHref({ ...historyFilter, targets: [{ param: 'music_id', id: String(item.id) }] })
+			)
+		: [];
 	// 시계열 카드의 주·월·학기마다: 같은 지기의 그 기간 선곡 기록(표의 기간, 차트의 막대·점).
 	$: timelineLinks = bucketHistoryLinks(historyFilter, timeline, semesters);
 	$: diversityLinks = bucketHistoryLinks(
@@ -1015,6 +1045,36 @@
 				links={diversityLinks}
 				on:itemclick={(e) => openBucket(diversityLinks, e)}
 				csv={diversityCsv}
+			/>
+		</div>
+
+		<!-- 처음 튼 작곡가·곡: 클럽 전체에서 처음 튼 날이 이 기간에 드는 것(stats/firsts) -->
+		<div class="section-head">
+			<h2>처음 튼 작곡가·곡</h2>
+		</div>
+		<div class="chart-grid">
+			<!-- 기간의 시작이 없으면(전체 기간, 시작을 비운 직접 지정) 모든 것이 '처음'이므로 묻지 않는다 -->
+			<TableCard
+				title="처음 튼 작곡가"
+				subtitle={firstsSubtitle(viewLabel, firstComposers, '작곡가', '명')}
+				table={firstComposers?.items.length ? firstsTable(firstComposers, '작곡가') : null}
+				links={firstComposerLinks}
+				loading={loading.firstComposers}
+				error={errors.firstComposers}
+				retry={() => retry('firstComposers')}
+				{fileTag}
+				emptyText={firstsAsked ? '' : '기간의 시작을 정하면 그 뒤에 처음 튼 작곡가를 봅니다'}
+			/>
+			<TableCard
+				title="처음 튼 곡"
+				subtitle={firstsSubtitle(viewLabel, firstWorks, '곡', '곡')}
+				table={firstWorks?.items.length ? firstsTable(firstWorks, '곡') : null}
+				links={firstWorkLinks}
+				loading={loading.firstWorks}
+				error={errors.firstWorks}
+				retry={() => retry('firstWorks')}
+				{fileTag}
+				emptyText={firstsAsked ? '' : '기간의 시작을 정하면 그 뒤에 처음 튼 곡을 봅니다'}
 			/>
 		</div>
 	{/if}
