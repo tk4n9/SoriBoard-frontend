@@ -19,7 +19,9 @@ import {
 	composerTimelineBucket,
 	composerWorkName,
 	composerWorksTable,
-	composerWorksCsv
+	composerWorksCsv,
+	composerIsWholeRecord,
+	composerWholeDates
 } from '../../src/lib/composerStats.js';
 import { readHistoryQuery, workHistoryHref } from '../../src/lib/playHistory.js';
 import { toCsvTable } from '../../src/lib/csvTable.js';
@@ -587,4 +589,45 @@ test('견습 포함 without a 지기 does not reach any link', () => {
 	assert.equal(composerStatHref(stray), '/stat?semester_id=7');
 	assert.equal(composerHistoryHref(7, [], stray), '/stat/history?semester_id=7&composer_id=7');
 	assert.equal(composerWorkHref(11, stray), '/stat/history?semester_id=7&music_id=11');
+});
+
+test('the date tiles get the whole record under them, except in the whole-record view', () => {
+	const whole = { date_start: '2019-03-05', date_end: '2026-10-20' };
+	const texts = { start: '전체 기록 2019-03-05', end: '전체 기록 2026-10-20' };
+	assert.equal(composerWholeDates({ period: 'all' }, whole), null);
+	assert.equal(
+		composerWholeDates({ period: 'all', userId: null, includeMentees: true }, whole),
+		null
+	);
+	// 날짜가 둘 다 빈 직접 지정은 기간 없이 부르므로 전체 기간과 같다.
+	assert.equal(composerWholeDates({ period: 'custom', start: '', end: '' }, whole), null);
+	for (const missing of [null, undefined]) {
+		assert.equal(composerWholeDates({ period: '7' }, missing), null);
+	}
+	assert.deepEqual(composerWholeDates({ period: '7' }, whole), texts);
+	assert.deepEqual(composerWholeDates({ period: 'current' }, whole), texts);
+	assert.deepEqual(
+		composerWholeDates({ period: 'custom', start: '2025-03-01', end: '' }, whole),
+		texts
+	);
+	assert.deepEqual(composerWholeDates({ period: 'all', userId: '12' }, whole), texts);
+	assert.deepEqual(
+		composerWholeDates({ period: '7' }, { date_start: null, date_end: '2026-10-20' }),
+		{
+			start: '',
+			end: '전체 기록 2026-10-20'
+		}
+	);
+	assert.deepEqual(
+		composerWholeDates({ period: '7' }, { date_start: '2019-03-05', date_end: null }),
+		{
+			start: '전체 기록 2019-03-05',
+			end: ''
+		}
+	);
+
+	assert.equal(composerIsWholeRecord({ period: 'all' }), true);
+	assert.equal(composerIsWholeRecord({ period: 'custom', start: '', end: '2026-01-01' }), false);
+	assert.equal(composerIsWholeRecord({ period: 'all', userId: '12' }), false);
+	assert.equal(composerIsWholeRecord({ period: '7' }), false);
 });

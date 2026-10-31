@@ -116,6 +116,25 @@ export function composerMemberParams({ userId = null, includeMentees = false }) 
 		: { user_id: String(userId) };
 }
 
+// 보기가 이 작곡가의 전체 기록인가: 전체 기간(또는 날짜가 둘 다 빈 직접 지정)에 전체 지기.
+/** @param {ComposerPeriod} filter */
+export function composerIsWholeRecord({ period, start = '', end = '', userId = null }) {
+	return !userId && (period === ALL || (period === CUSTOM && !start && !end));
+}
+
+// 처음·마지막 튼 날 칸 아래의 줄: 기간·지기 없는 stats/summary(whole)의 날짜. 보기가 전체 기록이거나
+// whole 이 없으면 null(줄이 없다). 날짜가 없으면 ''.
+/**
+ * @param {ComposerPeriod} filter
+ * @param {{ date_start?: string | null, date_end?: string | null } | null | undefined} whole
+ * @returns {{ start: string, end: string } | null}
+ */
+export function composerWholeDates(filter, whole) {
+	if (!whole || composerIsWholeRecord(filter)) return null;
+	const text = (/** @type {string | null | undefined} */ date) => (date ? `전체 기록 ${date}` : '');
+	return { start: text(whole.date_start), end: text(whole.date_end) };
+}
+
 // 카드 부제와 탭 제목에 넣을 기간의 이름. 학기가 목록에 아직 없으면 ''.
 /**
  * @param {ComposerPeriod} filter
