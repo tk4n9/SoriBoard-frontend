@@ -49,7 +49,7 @@
 		retryPrevious();
 	}
 
-	// 보이는 표 그대로(순위·곡·횟수, 지난 학기) 저장한다. 파일 이름은 카드의 CSV 저장과 같은 꼴.
+	// 보이는 표 그대로(순위·곡·횟수·처음·마지막, 지난 학기) 저장한다. 파일 이름은 카드의 CSV 저장과 같은 꼴.
 	function saveCsv() {
 		if (!table) return;
 		const { headers, rows } = tableCsv(table);
@@ -60,7 +60,8 @@
 	$: items = works ? works.items : [];
 	$: subtitle = works
 		? `${target.noun} · ${scopeLabel} · 총 ${works.total_plays.toLocaleString()}곡` +
-			(items.length >= WORKS_LIMIT ? ` · 상위 ${WORKS_LIMIT}곡` : '')
+			(items.length >= WORKS_LIMIT ? ` · 상위 ${WORKS_LIMIT}곡` : '') +
+			(items.length > 0 ? ' · 처음·마지막은 전체 기록 기준' : '')
 		: `${target.noun} · ${scopeLabel}`;
 	$: table = items.length > 0 && drillWorksTable(works, target, previous);
 	$: links = workLink ? items.map(workLink) : [];

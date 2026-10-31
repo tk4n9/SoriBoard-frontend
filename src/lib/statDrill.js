@@ -73,9 +73,12 @@ export function previousWorkCount(previous, id) {
 	return previous.items.length >= WORKS_LIMIT ? null : 0;
 }
 
-// 패널의 표: 순위, 곡, 횟수. 앞 학기의 같은 대상·범위의 목록(previous)을 주면 마지막에 지난 학기 칸을 둔다.
+// 패널의 표: 순위, 곡, 횟수, 처음, 마지막(작곡가 페이지의 곡 표와 같다). 날짜는 기간·대상과 상관없이
+// 그 곡의 전체 선곡 기준(stats/works 의 first_played·last_played), 없으면 '—'.
+// 앞 학기의 같은 대상·범위의 목록(previous)을 주면 마지막에 지난 학기 칸을 둔다.
 /**
- * @param {{ items: { id: number, name: string, count: number, composer_id?: number | null }[] }} works
+ * @param {{ items: { id: number, name: string, count: number, composer_id?: number | null,
+ *   first_played?: string | null, last_played?: string | null }[] }} works
  * @param {DrillTarget} target
  * @param {{ items: { id: number, count: number }[] } | null} [previous]
  * @returns {import('./statTable.js').Table}
@@ -86,14 +89,21 @@ export function drillWorksTable(works, target, previous = null) {
 		{ labels: items.map((item) => workLabel(item, target)), values: items.map((i) => i.count) },
 		'곡'
 	);
-	if (!previous) return table;
+	const columns = [
+		...table.columns,
+		{ name: '처음', numeric: true },
+		{ name: '마지막', numeric: true }
+	];
+	const rows = table.rows.map((row, i) => [
+		...row,
+		items[i].first_played ?? '—',
+		items[i].last_played ?? '—'
+	]);
+	if (!previous) return { ...table, columns, rows };
 	return {
 		...table,
-		columns: [...table.columns, { name: '지난 학기', numeric: true }],
-		rows: table.rows.map((row, i) => [
-			...row,
-			formatCount(previousWorkCount(previous, items[i].id))
-		])
+		columns: [...columns, { name: '지난 학기', numeric: true }],
+		rows: rows.map((row, i) => [...row, formatCount(previousWorkCount(previous, items[i].id))])
 	};
 }
 
