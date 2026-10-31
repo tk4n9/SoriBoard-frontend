@@ -64,7 +64,7 @@
 		rankChangeTable,
 		firstsTable
 	} from '$lib/semesterReport.js';
-	import { hasPeriodStart, firstsSubtitle } from '$lib/statFirsts.js';
+	import { hasPeriodStart, firstsSubtitle, firstsEmptyText } from '$lib/statFirsts.js';
 	import { memberFileText } from '$lib/statFileName.js';
 	import { pageTitle, periodTitle } from '$lib/statTitle.js';
 
@@ -1079,7 +1079,11 @@
 				error={errors.firstComposers}
 				retry={() => retry('firstComposers')}
 				{fileTag}
-				emptyText={firstsAsked ? '' : '기간의 시작을 정하면 그 뒤에 처음 튼 작곡가를 봅니다'}
+				emptyText={!firstsAsked
+					? '기간의 시작을 정하면 그 뒤에 처음 튼 작곡가를 봅니다'
+					: firstComposers?.items.length === 0
+						? firstsEmptyText('처음 튼 작곡가', '명', previousFirstComposers)
+						: ''}
 			/>
 			<TableCard
 				title="처음 튼 곡"
@@ -1090,7 +1094,11 @@
 				error={errors.firstWorks}
 				retry={() => retry('firstWorks')}
 				{fileTag}
-				emptyText={firstsAsked ? '' : '기간의 시작을 정하면 그 뒤에 처음 튼 곡을 봅니다'}
+				emptyText={!firstsAsked
+					? '기간의 시작을 정하면 그 뒤에 처음 튼 곡을 봅니다'
+					: firstWorks?.items.length === 0
+						? firstsEmptyText('처음 튼 곡', '곡', previousFirstWorks)
+						: ''}
 			/>
 		</div>
 	{/if}
