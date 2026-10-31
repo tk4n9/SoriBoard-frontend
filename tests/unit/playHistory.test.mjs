@@ -20,6 +20,7 @@ import {
 	workText,
 	workParts,
 	performersText,
+	recordingParts,
 	jigiNames,
 	jigiText,
 	fetchAllPlays,
@@ -466,7 +467,9 @@ test('a play is one CSV row, one column per header', () => {
 		orchestra_name: '가상 오케스트라',
 		conductor_name: '가상 지휘자',
 		jigi_names: ['가상일', '가상이'],
-		mentee_names: ['가상사']
+		mentee_names: ['가상사'],
+		source: 'CD',
+		cd_id: ' 1234 '
 	};
 	assert.deepEqual(PLAY_CSV_HEADERS, [
 		'날짜',
@@ -479,7 +482,9 @@ test('a play is one CSV row, one column per header', () => {
 		'지휘자',
 		'지기',
 		'견습 지기',
-		'신청곡'
+		'신청곡',
+		'음원 종류',
+		'음반 번호'
 	]);
 	assert.deepEqual(playCsvRow(play), [
 		'2024-03-06',
@@ -492,15 +497,38 @@ test('a play is one CSV row, one column per header', () => {
 		'가상 지휘자',
 		'가상일, 가상이',
 		'가상사',
-		'O'
+		'O',
+		'CD',
+		'1234'
 	]);
 	const bare = { id: 1, time_id: 1, date: '2026-10-23', time: 3, is_requested: false };
 	const row = playCsvRow(bare);
 	assert.equal(row.length, PLAY_CSV_HEADERS.length);
 	assert.deepEqual(
 		row.map((cell) => cell ?? ''),
-		['2026-10-23', 3, '', '', '', '', '', '', '', '', '']
+		['2026-10-23', 3, '', '', '', '', '', '', '', '', '', '', '']
 	);
+});
+
+test('recordingParts gives the trimmed 음반 번호 and 음원 종류, or empty', () => {
+	const play = { id: 1, time_id: 1, date: '2026-10-02', time: 3, is_requested: false };
+	assert.deepEqual(recordingParts({ ...play, cd_id: ' 1234 ', source: 'CD' }), {
+		number: '1234',
+		source: 'CD'
+	});
+	assert.deepEqual(recordingParts({ ...play, cd_id: null, source: 'LP' }), {
+		number: '',
+		source: 'LP'
+	});
+	assert.deepEqual(recordingParts({ ...play, cd_id: 'DG 477 5432', source: '' }), {
+		number: 'DG 477 5432',
+		source: ''
+	});
+	assert.deepEqual(recordingParts({ ...play, cd_id: '   ', source: ' \t' }), {
+		number: '',
+		source: ''
+	});
+	assert.deepEqual(recordingParts(play), { number: '', source: '' });
 });
 
 test('semesterRangeParams asks stats/summary for a 학기 only', () => {

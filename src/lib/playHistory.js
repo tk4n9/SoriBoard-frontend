@@ -334,7 +334,7 @@ export async function fetchAllPlays(fetchPage, onProgress = () => {}) {
 
 /** @typedef {{ id: number, time_id: number, date: string, time: number, is_requested: boolean,
  *   composer_id?: number | null, composer_name?: string, music_title?: string,
- *   music_semi_title?: string,
+ *   music_semi_title?: string, source?: string, cd_id?: string | null,
  *   conductor_name?: string, orchestra_name?: string, player_names?: string[],
  *   jigi_names?: string[], mentee_names?: string[] }} Play */
 
@@ -370,6 +370,13 @@ export function performersText(play) {
 		.join(' · ');
 }
 
+// 그 선곡의 음반 번호(cd_id)와 음원 종류(source), 앞뒤 공백을 뺀 것. 없거나 비었으면 ''.
+/** @param {Play} play */
+export function recordingParts(play) {
+	const trim = (/** @type {unknown} */ value) => (typeof value === 'string' ? value.trim() : '');
+	return { number: trim(play.cd_id), source: trim(play.source) };
+}
+
 // 그 타임의 지기와 견습 지기, 한 사람에 하나씩(견습은 '이름(견습)').
 /** @param {Play} play */
 export function jigiNames(play) {
@@ -383,6 +390,7 @@ export function jigiText(play) {
 }
 
 // 선곡 기록 CSV 의 열과 한 선곡의 행. 여러 연주자·지기는 한 칸에 ', ' 로 잇는다.
+// 음원 종류·음반 번호는 나중에 더한 열이라, 이전 CSV 의 열 위치가 그대로이도록 맨 끝에 둔다.
 export const PLAY_CSV_HEADERS = [
 	'날짜',
 	'타임',
@@ -394,7 +402,9 @@ export const PLAY_CSV_HEADERS = [
 	'지휘자',
 	'지기',
 	'견습 지기',
-	'신청곡'
+	'신청곡',
+	'음원 종류',
+	'음반 번호'
 ];
 
 /** @param {Play} play */
@@ -409,5 +419,7 @@ export const playCsvRow = (play) => [
 	play.conductor_name,
 	(play.jigi_names ?? []).join(', '),
 	(play.mentee_names ?? []).join(', '),
-	play.is_requested ? 'O' : ''
+	play.is_requested ? 'O' : '',
+	recordingParts(play).source,
+	recordingParts(play).number
 ];
