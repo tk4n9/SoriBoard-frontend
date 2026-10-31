@@ -243,10 +243,13 @@
 	// 시대·장르의 표도 앞 학기의 비율과 견준다(학기 결산의 mixTable). 실패하면 그 표만 지금과 같다.
 	// 선곡 다양성의 칸도 앞 학기의 다양성 응답과 견준다(버킷과 무관하므로 백엔드 기본 버킷으로 부른다).
 	// 많이 튼 표에는 앞 학기 같은 길이의 목록에서의 순위를 붙인다(학기 결산의 rankChangeTable).
+	// 처음 튼 작곡가·곡의 부제에는 앞 학기에 처음 튼 수를 붙인다(같은 firsts 를 kind 별로 부른다).
 	let previousSummary = null;
 	let previousEras = null;
 	let previousGenres = null;
 	let previousTiles = null;
+	let previousFirstComposers = null;
+	let previousFirstWorks = null;
 	/** @type {Record<string, any>} 순위 카드별 앞 학기의 목록(LIMITS 의 키) */
 	let previousRanks = {};
 	let previousAsked = null; // 마지막으로 부른 앞 학기 id(없으면 null)
@@ -264,6 +267,16 @@
 		eras: { apply: (result) => (previousEras = result) },
 		genres: { apply: (result) => (previousGenres = result) },
 		diversity: { apply: (result) => (previousTiles = diversityTiles(result)) },
+		firstComposers: {
+			endpoint: 'firsts',
+			extra: { kind: 'composer' },
+			apply: (result) => (previousFirstComposers = result)
+		},
+		firstWorks: {
+			endpoint: 'firsts',
+			extra: { kind: 'work' },
+			apply: (result) => (previousFirstWorks = result)
+		},
 		...Object.fromEntries(
 			Object.entries(LIMITS).map(([key, limit]) => [
 				key,
@@ -276,10 +289,11 @@
 	};
 	async function askPrevious(endpoint) {
 		const id = previousToken;
-		const { apply, extra = {} } = previousRequests[endpoint];
+		// 기록이 endpoint 를 밝히면 그것을 부른다(키가 같은 엔드포인트를 둘이 나눠 쓸 때).
+		const { apply, extra = {}, endpoint: path = endpoint } = previousRequests[endpoint];
 		try {
 			// buildQuery 는 extra 를 마지막에 넣으므로 기간의 semester_id 만 바뀌고 지기는 그대로다.
-			const result = await getJson(endpoint, { ...extra, semester_id: String(previousTarget.id) });
+			const result = await getJson(path, { ...extra, semester_id: String(previousTarget.id) });
 			if (requests.isLatest('previousSummary', id)) apply(result);
 		} catch (e) {
 			if (requests.isLatest('previousSummary', id)) {
@@ -298,6 +312,8 @@
 		previousEras = null;
 		previousGenres = null;
 		previousTiles = null;
+		previousFirstComposers = null;
+		previousFirstWorks = null;
 		previousRanks = {};
 		if (!previous || (scope === 'individual' && !userId)) return;
 		await Promise.allSettled(Object.keys(previousRequests).map(askPrevious));
@@ -1056,7 +1072,7 @@
 			<!-- 기간의 시작이 없으면(전체 기간, 시작을 비운 직접 지정) 모든 것이 '처음'이므로 묻지 않는다 -->
 			<TableCard
 				title="처음 튼 작곡가"
-				subtitle={firstsSubtitle(viewLabel, firstComposers, '작곡가', '명')}
+				subtitle={firstsSubtitle(viewLabel, firstComposers, '작곡가', '명', previousFirstComposers)}
 				table={firstComposers?.items.length ? firstsTable(firstComposers, '작곡가') : null}
 				links={firstComposerLinks}
 				loading={loading.firstComposers}
@@ -1067,7 +1083,7 @@
 			/>
 			<TableCard
 				title="처음 튼 곡"
-				subtitle={firstsSubtitle(viewLabel, firstWorks, '곡', '곡')}
+				subtitle={firstsSubtitle(viewLabel, firstWorks, '곡', '곡', previousFirstWorks)}
 				table={firstWorks?.items.length ? firstsTable(firstWorks, '곡') : null}
 				links={firstWorkLinks}
 				loading={loading.firstWorks}
