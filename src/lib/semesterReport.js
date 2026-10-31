@@ -195,15 +195,17 @@ export function mixTable(current, previous, nameHeader) {
 // 상위 10 표(순위, 이름, 횟수)에 지난 학기 칸: 그 행의 지난 학기 상위 10 에서의 순위(순위 칸처럼
 // 같은 횟수는 같은 순위). 거기 없으면 '10위 밖'(limit 은 목록의 길이, 통계의 작곡가·독주자는 12),
 // 지난 학기에 선곡이 없으면 '—'. 이름이 아니라 id 로 맞춘다(이름이 같은 다른 대상).
+// firstIds(이 기간에 클럽에서 처음 튼 대상의 id)에 들면 '10위 밖' 대신 '첫 선곡'.
 // 지난 학기가 없거나 받지 못하면(null) 칸을 두지 않는다.
 /**
  * @param {{ labels: string[], values: number[], items: { id: number }[] }} current
  * @param {{ total_plays: number, values: number[], items: { id: number }[] } | null} previous
  * @param {string} nameHeader
  * @param {number} [limit]
+ * @param {Set<number> | null} [firstIds]
  * @returns {import('./statTable.js').Table}
  */
-export function rankChangeTable(current, previous, nameHeader, limit = 10) {
+export function rankChangeTable(current, previous, nameHeader, limit = 10, firstIds = null) {
 	const table = rankTable(current, nameHeader);
 	if (!previous) return table;
 	const empty = previous.total_plays === 0 || !previous.items.length;
@@ -213,10 +215,21 @@ export function rankChangeTable(current, previous, nameHeader, limit = 10) {
 		...table,
 		columns: [...table.columns, { name: '지난 학기', numeric: true }],
 		rows: table.rows.map((row, i) => {
-			const rank = before.get(current.items[i]?.id);
-			return [...row, empty ? '—' : rank ? `${rank}위` : `${limit}위 밖`];
+			const id = current.items[i]?.id;
+			const rank = before.get(id);
+			const outside = firstIds?.has(id) ? '첫 선곡' : `${limit}위 밖`;
+			return [...row, empty ? '—' : rank ? `${rank}위` : outside];
 		})
 	};
+}
+
+// 처음 튼 목록(stats/firsts)의 id 모음(rankChangeTable 의 firstIds). 받지 못했으면 null.
+/**
+ * @param {{ items: { id: number }[] } | null | undefined} firsts
+ * @returns {Set<number> | null}
+ */
+export function firstIdSet(firsts) {
+	return firsts ? new Set(firsts.items.map((item) => item.id)) : null;
 }
 
 // 처음 튼 작곡가·곡(stats/firsts): 이름, 처음 튼 날, 이 학기 횟수(백엔드 순서 = 처음 튼 날 순).

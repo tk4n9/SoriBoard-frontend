@@ -11,6 +11,7 @@ import {
 	mixTable,
 	mixSubtitle,
 	rankChangeTable,
+	firstIdSet,
 	loadWithPrevious,
 	firstsTable,
 	reportRangeText
@@ -263,6 +264,69 @@ test('rankChangeTable names the list’s length for a row missing from the previ
 		rankChangeTable(now, ranking([], 0), '작곡가', 12).rows.map((row) => row[3]),
 		['—', '—']
 	);
+});
+
+test('rankChangeTable reads 첫 선곡 for a row first played this 학기, not N위 밖', () => {
+	const now = ranking([
+		[1, '브람스 - 교향곡 제1번', 12],
+		[4, '가상 작곡가 - 신곡', 7],
+		[6, '모차르트 - 레퀴엠', 5]
+	]);
+	const before = ranking([
+		[9, '말러 - 교향곡 제5번', 8],
+		[8, '바흐 - 미사', 6],
+		[1, '브람스 - 교향곡 제1번', 4]
+	]);
+	const firsts = new Set([4]);
+	assert.deepEqual(rankChangeTable(now, before, '곡', 10, firsts).rows, [
+		['1', '브람스 - 교향곡 제1번', '12', '3위'],
+		['2', '가상 작곡가 - 신곡', '7', '첫 선곡'],
+		['3', '모차르트 - 레퀴엠', '5', '10위 밖']
+	]);
+	assert.deepEqual(
+		rankChangeTable(now, before, '곡', 12, firsts).rows.map((row) => row[3]),
+		['3위', '첫 선곡', '12위 밖']
+	);
+	// 처음 튼 목록이 없으면(아직 오지 않았거나 실패) 지금처럼 'N위 밖'.
+	assert.deepEqual(
+		rankChangeTable(now, before, '곡', 10, null).rows.map((row) => row[3]),
+		['3위', '10위 밖', '10위 밖']
+	);
+});
+
+test('rankChangeTable keeps a previous rank over 첫 선곡, and dashes for an empty 학기', () => {
+	const now = ranking([
+		[1, '브람스', 12],
+		[4, '가상 작곡가', 7]
+	]);
+	const before = ranking([[1, '브람스', 4]]);
+	// 지난 학기 순위가 있으면 (맞지 않게) firstIds 에 있어도 순위.
+	assert.deepEqual(
+		rankChangeTable(now, before, '작곡가', 10, new Set([1, 4])).rows.map((row) => row[3]),
+		['1위', '첫 선곡']
+	);
+	// 지난 학기에 선곡이 없으면 firstIds 와 상관없이 '—'.
+	assert.deepEqual(
+		rankChangeTable(now, ranking([], 0), '작곡가', 10, new Set([1, 4])).rows.map((row) => row[3]),
+		['—', '—']
+	);
+	// 지난 학기가 없으면 칸이 없다.
+	assert.deepEqual(
+		rankChangeTable(now, null, '작곡가', 10, new Set([1, 4])),
+		rankTable(now, '작곡가')
+	);
+});
+
+test('firstIdSet collects the ids of a firsts list, or null without one', () => {
+	assert.equal(firstIdSet(null), null);
+	assert.equal(firstIdSet(undefined), null);
+	const ids = firstIdSet({ items: [{ id: 3 }, { id: 9 }] });
+	assert.ok(ids instanceof Set);
+	assert.deepEqual(
+		[...ids].sort((a, b) => a - b),
+		[3, 9]
+	);
+	assert.equal(firstIdSet({ items: [] }).size, 0);
 });
 
 test('firstsTable lists name, first play and count in backend order', () => {
