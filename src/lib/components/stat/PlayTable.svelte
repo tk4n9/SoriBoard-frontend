@@ -1,5 +1,5 @@
 <script>
-	import { sessionText, workText, workParts, performersText, jigiText } from '$lib/playHistory.js';
+	import { sessionText, workText, workParts, performersText, jigiNames } from '$lib/playHistory.js';
 	import { composerHref } from '$lib/composerStats.js';
 
 	// 선곡 기록의 결과 표. 날짜·타임은 그 타임 화면으로, 작곡가는 그 작곡가 페이지로 가는 링크다.
@@ -46,7 +46,10 @@
 					{/if}
 				</td>
 				<td>{performersText(play)}</td>
-				<td>{jigiText(play)}</td>
+				<td>
+					{#each jigiNames(play) as name, i}{#if i}{', '}{/if}<span class="jigi">{name}</span
+						>{/each}
+				</td>
 				<td class="narrow">{play.is_requested ? '신청곡' : ''}</td>
 			</tr>
 		{/each}
@@ -103,6 +106,10 @@
 	}
 	.missing {
 		color: var(--gray-gray-500, #9f9f9f);
+	}
+	/* 이름은 글자 사이에서 끊지 않고, 여러 지기면 이름 사이에서만 줄을 바꾼다 */
+	.jigi {
+		white-space: nowrap;
 	}
 	.narrow {
 		width: 1%;

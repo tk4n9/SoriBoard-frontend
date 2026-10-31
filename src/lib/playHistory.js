@@ -370,13 +370,16 @@ export function performersText(play) {
 		.join(' · ');
 }
 
+// 그 타임의 지기와 견습 지기, 한 사람에 하나씩(견습은 '이름(견습)').
+/** @param {Play} play */
+export function jigiNames(play) {
+	return [...(play.jigi_names ?? []), ...(play.mentee_names ?? []).map((name) => `${name}(견습)`)];
+}
+
 // 그 타임의 지기와 견습 지기.
 /** @param {Play} play */
 export function jigiText(play) {
-	return [
-		...(play.jigi_names ?? []),
-		...(play.mentee_names ?? []).map((name) => `${name}(견습)`)
-	].join(', ');
+	return jigiNames(play).join(', ');
 }
 
 // 선곡 기록 CSV 의 열과 한 선곡의 행. 여러 연주자·지기는 한 칸에 ', ' 로 잇는다.

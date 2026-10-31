@@ -20,6 +20,7 @@ import {
 	workText,
 	workParts,
 	performersText,
+	jigiNames,
 	jigiText,
 	fetchAllPlays,
 	playCsvRow,
@@ -322,6 +323,7 @@ test('row texts', () => {
 		performersText(play),
 		'피아노: 가상 피아니스트 · 첼로: 가상 첼리스트 · 가상 오케스트라 · 지휘: 가상 지휘자'
 	);
+	assert.deepEqual(jigiNames(play), ['가상일', '가상이', '가상사(견습)']);
 	assert.equal(jigiText(play), '가상일, 가상이, 가상사(견습)');
 });
 
@@ -329,6 +331,7 @@ test('a play without music or performers still reads', () => {
 	const bare = { id: 1, time_id: 1, date: '2026-10-23', time: 3, is_requested: false };
 	assert.equal(workText(bare), '곡 정보 없음');
 	assert.equal(performersText(bare), '');
+	assert.deepEqual(jigiNames(bare), []);
 	assert.equal(jigiText(bare), '');
 	assert.equal(workText({ ...bare, music_title: '무제' }), '무제');
 	assert.equal(performersText({ ...bare, player_names: [] }), '');
