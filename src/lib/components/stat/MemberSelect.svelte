@@ -14,6 +14,8 @@
 	let users = [];
 	// 목록을 못 받으면 알림창 대신 select 아래에 짧게 적는다.
 	let listError = '';
+	// 견습 포함이 세는 것: 고른 지기의 견습들이 튼 곡이 아니라, 그 지기가 견습으로 들어간 타임이다.
+	const menteeTitle = '이 지기가 견습으로 들어간 타임도 셉니다';
 
 	// 지기 목록을 부른다(처음, 그리고 '다시 시도'). 받았는지를 돌려준다.
 	async function loadList() {
@@ -30,6 +32,7 @@
 		const known = knownUser(userId, users);
 		if (known !== userId) {
 			userId = known;
+			if (!userId) includeMentees = false;
 			dispatch('change', { userId, includeMentees });
 		}
 		return true;
@@ -55,6 +58,8 @@
 
 	function onUserChange(e) {
 		userId = e.target.value || null;
+		// 지기를 지우면 견습 포함도 지운다(다시 고르면 새 페이지처럼 꺼진 채로 시작한다).
+		if (!userId) includeMentees = false;
 		dispatch('change', { userId, includeMentees });
 	}
 	function onMenteeChange(e) {
@@ -76,8 +81,14 @@
 			<option value={String(user.id)}>{user.name} {user.major} {user.year_id}</option>
 		{/each}
 	</select>
-	<label class="mentee">
-		<input type="checkbox" checked={includeMentees} on:change={onMenteeChange} />
+	<label class="mentee" class:off={!userId} title={menteeTitle}>
+		<input
+			type="checkbox"
+			checked={includeMentees && Boolean(userId)}
+			disabled={!userId}
+			title={menteeTitle}
+			on:change={onMenteeChange}
+		/>
 		견습 포함
 	</label>
 	<div class="list-note">
@@ -136,6 +147,16 @@
 		align-items: center;
 		gap: 4px;
 		cursor: pointer;
+	}
+	/* 견습 포함은 지기를 고른 때만 뜻이 있으므로, 그 전에는 '다시 시도'의 비활성 모양으로 꺼 둔다. */
+	.mentee.off {
+		color: var(--gray-gray-500);
+		cursor: default;
+	}
+	.mentee input[type='checkbox']:disabled {
+		border-color: var(--gray-gray-400);
+		background: var(--secondary-secondary-50);
+		cursor: default;
 	}
 	/* PeriodSelect 의 범위 문구처럼 머리말 아래 여백에 띄워, 머리말 높이가 바뀌지 않게 한다. */
 	.list-note {
