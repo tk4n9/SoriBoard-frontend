@@ -19,8 +19,7 @@ import {
 	composerTimelineBucket,
 	composerWorkName,
 	composerWorksTable,
-	composerWorksCsv,
-	previousWorkCount
+	composerWorksCsv
 } from '../../src/lib/composerStats.js';
 import { readHistoryQuery, workHistoryHref } from '../../src/lib/playHistory.js';
 import { toCsvTable } from '../../src/lib/csvTable.js';
@@ -181,21 +180,6 @@ test('the works CSV has one row per work: name, count, first and last play, no r
 		['C - 가', 'C - 나, "작품 2"', 'D - 다']
 	);
 	assert.deepEqual(composerWorksCsv({ items: [] }, null).rows, []);
-});
-
-test('previousWorkCount: the count by id, 0 when absent, unknown when the list was cut', () => {
-	const previous = {
-		items: [
-			{ id: 7, count: 4 },
-			{ id: 8, count: 1 }
-		]
-	};
-	assert.equal(previousWorkCount(previous, 7), 4);
-	assert.equal(previousWorkCount(previous, 9), 0);
-	assert.equal(previousWorkCount({ total_plays: 0, items: [] }, 7), 0);
-	const cut = { items: Array.from({ length: WORKS_LIMIT }, (_, i) => ({ id: 100 + i, count: 1 })) };
-	assert.equal(previousWorkCount(cut, 100), 1);
-	assert.equal(previousWorkCount(cut, 7), null);
 });
 
 test('with the previous 학기, the works table and CSV add 지난 학기, matched by id', () => {

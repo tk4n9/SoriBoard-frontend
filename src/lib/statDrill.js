@@ -1,5 +1,6 @@
 // 통계 drill-down: 순위 카드(작곡가·독주자·지휘자·오케스트라)의 막대나 표의 행에서 그 뒤의 곡으로.
 // 막대·행의 위치를 응답의 items[i] 로 되돌리고, 이름이 아니라 id 로 거른다(이름은 겹칠 수 있다).
+import { formatCount, rankTable } from './statTable.js';
 
 /** @typedef {{ card: string, param: string, noun: string, id: number, name: string }} DrillTarget */
 
@@ -57,6 +58,43 @@ export function workLabel(item, target) {
 	if (target.card === 'composers' && item.composer_id === target.id && item.name.startsWith(prefix))
 		return item.name.slice(prefix.length);
 	return item.name;
+}
+
+// 지난 학기 칸: 그 곡을 앞 학기에 튼 횟수(이름이 아니라 id 로 맞춘다). 앞 학기 목록에 없으면 0.
+// 단, 앞 학기 목록이 WORKS_LIMIT 에서 잘렸으면 없는 곡의 횟수는 알 수 없다(null: 표는 '—', CSV 는 빈칸).
+/**
+ * @param {{ items: { id: number, count: number }[] }} previous
+ * @param {number} id
+ * @returns {number | null}
+ */
+export function previousWorkCount(previous, id) {
+	const found = previous.items.find((item) => item.id === id);
+	if (found) return found.count;
+	return previous.items.length >= WORKS_LIMIT ? null : 0;
+}
+
+// 패널의 표: 순위, 곡, 횟수. 앞 학기의 같은 대상·범위의 목록(previous)을 주면 마지막에 지난 학기 칸을 둔다.
+/**
+ * @param {{ items: { id: number, name: string, count: number, composer_id?: number | null }[] }} works
+ * @param {DrillTarget} target
+ * @param {{ items: { id: number, count: number }[] } | null} [previous]
+ * @returns {import('./statTable.js').Table}
+ */
+export function drillWorksTable(works, target, previous = null) {
+	const { items } = works;
+	const table = rankTable(
+		{ labels: items.map((item) => workLabel(item, target)), values: items.map((i) => i.count) },
+		'곡'
+	);
+	if (!previous) return table;
+	return {
+		...table,
+		columns: [...table.columns, { name: '지난 학기', numeric: true }],
+		rows: table.rows.map((row, i) => [
+			...row,
+			formatCount(previousWorkCount(previous, items[i].id))
+		])
+	};
 }
 
 // 열린 패널은 URL의 drill(카드)·drill_id 에 둔다(링크로 같은 패널을 연다). 이름은 싣지 않는다:

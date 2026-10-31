@@ -4,7 +4,7 @@
 // (user_id, include_mentees)로 두고, 기본값(전체 지기)은 남기지 않는다. 링크는 모두 그 기간·지기를 연다.
 import { CURRENT, ALL, CUSTOM, readStatPeriod, readStatRange } from './statPeriod.js';
 import { historyHref, bucketHistoryLinks, statHref } from './playHistory.js';
-import { DRILL_CARDS, WORKS_LIMIT } from './statDrill.js';
+import { DRILL_CARDS, previousWorkCount } from './statDrill.js';
 import { competitionRanks, formatCount } from './statTable.js';
 import { periodTitle } from './statTitle.js';
 import { spansSemesters } from './statBucket.js';
@@ -240,19 +240,6 @@ export function composerWorkName(item, composer) {
 		return item.name.slice(prefix.length);
 	}
 	return item.name;
-}
-
-// 지난 학기 칸: 그 곡을 앞 학기에 튼 횟수(이름이 아니라 id 로 맞춘다). 앞 학기 목록에 없으면 0.
-// 단, 앞 학기 목록이 WORKS_LIMIT 에서 잘렸으면 없는 곡의 횟수는 알 수 없다(null: 표는 '—', CSV 는 빈칸).
-/**
- * @param {{ items: { id: number, count: number }[] }} previous
- * @param {number} id
- * @returns {number | null}
- */
-export function previousWorkCount(previous, id) {
-	const found = previous.items.find((item) => item.id === id);
-	if (found) return found.count;
-	return previous.items.length >= WORKS_LIMIT ? null : 0;
 }
 
 // 곡 표: 순위, 곡, 횟수, 처음 튼 날, 마지막으로 튼 날(날짜는 기간과 상관없이 그 곡의 전체 선곡 기준).

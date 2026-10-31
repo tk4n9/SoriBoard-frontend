@@ -7,6 +7,8 @@ import {
 	drillTarget,
 	drillParams,
 	workLabel,
+	previousWorkCount,
+	drillWorksTable,
 	readDrillQuery,
 	writeDrillQuery,
 	drillItemIndex
@@ -98,6 +100,83 @@ test('other panels keep the composer in each work', () => {
 	const target = drillTarget('conductors', { items: [{ id: 7, name: '가' }] }, 0);
 	assert.ok(target);
 	assert.equal(workLabel({ name: '가 - 교향곡 1번', composer_id: 7 }, target), '가 - 교향곡 1번');
+});
+
+test('previousWorkCount: the count by id, 0 when absent, unknown when the list was cut', () => {
+	const previous = {
+		items: [
+			{ id: 7, count: 4 },
+			{ id: 8, count: 1 }
+		]
+	};
+	assert.equal(previousWorkCount(previous, 7), 4);
+	assert.equal(previousWorkCount(previous, 9), 0);
+	assert.equal(previousWorkCount({ total_plays: 0, items: [] }, 7), 0);
+	const cut = { items: Array.from({ length: WORKS_LIMIT }, (_, i) => ({ id: 100 + i, count: 1 })) };
+	assert.equal(previousWorkCount(cut, 100), 1);
+	assert.equal(previousWorkCount(cut, 7), null);
+});
+
+test('drillWorksTable: 순위, 곡, 횟수, with the composer dropped from its own panel', () => {
+	const target = drillTarget('composers', { items: [{ id: 7, name: '가' }] }, 0);
+	assert.ok(target);
+	const works = {
+		items: [
+			{ id: 1, name: '가 - 교향곡 1번', count: 1234, composer_id: 7 },
+			{ id: 2, name: '가 - 소품', count: 3, composer_id: 7 },
+			{ id: 3, name: '나 - 소품', count: 3, composer_id: 8 }
+		]
+	};
+	assert.deepEqual(drillWorksTable(works, target), {
+		columns: [{ name: '순위', numeric: true }, { name: '곡' }, { name: '횟수', numeric: true }],
+		rowHeader: 1,
+		rows: [
+			['1', '교향곡 1번', '1,234'],
+			['2', '소품', '3'],
+			['2', '나 - 소품', '3']
+		]
+	});
+	const conductor = drillTarget('conductors', { items: [{ id: 7, name: '가' }] }, 0);
+	assert.ok(conductor);
+	assert.deepEqual(
+		drillWorksTable(works, conductor).rows.map((row) => row[1]),
+		['가 - 교향곡 1번', '가 - 소품', '나 - 소품']
+	);
+	assert.deepEqual(drillWorksTable({ items: [] }, target).rows, []);
+});
+
+test('drillWorksTable with the previous 학기 adds 지난 학기, matched by id', () => {
+	const target = drillTarget('soloists', { items: [{ id: 4, name: '연주자' }] }, 0);
+	assert.ok(target);
+	// 이름이 같은 두 곡(id 2, 3): 지난 학기 칸은 id 로 맞춘다.
+	const works = {
+		items: [
+			{ id: 2, name: 'C - 가', count: 5, composer_id: 1 },
+			{ id: 3, name: 'C - 가', count: 4, composer_id: 1 },
+			{ id: 9, name: 'D - 나', count: 1, composer_id: 2 }
+		]
+	};
+	const previous = {
+		items: [
+			{ id: 3, count: 1234 },
+			{ id: 2, count: 1 }
+		]
+	};
+	const table = drillWorksTable(works, target, previous);
+	assert.deepEqual(table.columns.at(-1), { name: '지난 학기', numeric: true });
+	assert.equal(table.columns.length, 4);
+	assert.deepEqual(table.rows, [
+		['1', 'C - 가', '5', '1'],
+		['2', 'C - 가', '4', '1,234'],
+		['3', 'D - 나', '1', '0']
+	]);
+	// 앞 학기 목록이 WORKS_LIMIT 에서 잘렸으면 그 안에 없는 곡은 알 수 없다.
+	const cut = { items: Array.from({ length: WORKS_LIMIT }, (_, i) => ({ id: 100 + i, count: 1 })) };
+	assert.deepEqual(
+		drillWorksTable(works, target, cut).rows.map((row) => row[3]),
+		['—', '—', '—']
+	);
+	assert.deepEqual(drillWorksTable(works, target, null), drillWorksTable(works, target));
 });
 
 const read = (search) => readDrillQuery(new URLSearchParams(search));

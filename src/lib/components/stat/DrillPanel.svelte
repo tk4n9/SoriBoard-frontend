@@ -1,8 +1,7 @@
 <script>
 	import { onMount, createEventDispatcher } from 'svelte';
 	import DataTable from './DataTable.svelte';
-	import { rankTable } from '$lib/statTable.js';
-	import { WORKS_LIMIT, workLabel } from '$lib/statDrill.js';
+	import { WORKS_LIMIT, drillWorksTable } from '$lib/statDrill.js';
 	import { closeOnEscape } from '$lib/escapeKey.js';
 	import { downloadCsvTable, tableCsv } from '$lib/csvTable.js';
 	import { todayStamp } from '$lib/csv.js';
@@ -12,6 +11,7 @@
 	/** @type {import('$lib/statDrill.js').DrillTarget} */
 	export let target;
 	export let works = null; // stats/works 응답
+	export let previous = null; // 앞 학기의 같은 대상·범위의 stats/works 응답. 주면 표에 지난 학기 칸이 붙는다.
 	export let loading = false;
 	export let error = '';
 	export let scopeLabel = '';
@@ -41,7 +41,7 @@
 		retry();
 	}
 
-	// 보이는 표 그대로(순위·곡·횟수) 저장한다. 파일 이름은 카드의 CSV 저장과 같은 꼴.
+	// 보이는 표 그대로(순위·곡·횟수, 지난 학기) 저장한다. 파일 이름은 카드의 CSV 저장과 같은 꼴.
 	function saveCsv() {
 		if (!table) return;
 		const { headers, rows } = tableCsv(table);
@@ -54,12 +54,7 @@
 		? `${target.noun} · ${scopeLabel} · 총 ${works.total_plays.toLocaleString()}곡` +
 			(items.length >= WORKS_LIMIT ? ` · 상위 ${WORKS_LIMIT}곡` : '')
 		: `${target.noun} · ${scopeLabel}`;
-	$: table =
-		items.length > 0 &&
-		rankTable(
-			{ labels: items.map((item) => workLabel(item, target)), values: items.map((i) => i.count) },
-			'곡'
-		);
+	$: table = items.length > 0 && drillWorksTable(works, target, previous);
 	$: links = workLink ? items.map(workLink) : [];
 </script>
 

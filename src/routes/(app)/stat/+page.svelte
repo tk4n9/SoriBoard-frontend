@@ -338,9 +338,35 @@
 	// URL로 연 패널(drill·drill_id): 그 카드가 처음 불러와지면 id 로 항목을 찾아 연다.
 	// 그 기간·범위의 항목에 없으면 이름을 알 수 없으므로 열지 않고 URL에서도 지운다.
 	let linkedDrill = readDrillQuery($page.url.searchParams);
+	// 기간이 앞 학기가 있는 학기면 같은 대상·범위의 앞 학기 곡도 불러 패널의 표에 지난 학기 칸을 붙인다.
+	// 실패하면 콘솔에만 남기고 표는 지금과 같다.
+	let previousDrillWorks = null;
+	let previousDrillFor = null; // 마지막으로 부른 앞 학기 id(없으면 null)
+
+	async function loadPreviousDrill() {
+		const id = requests.begin(['previousDrill']);
+		const previous = previousOf(period, semesters);
+		previousDrillFor = previous?.id ?? null;
+		previousDrillWorks = null;
+		if (!drill || !previous || (scope === 'individual' && !userId)) return;
+		try {
+			// buildQuery 는 extra 를 마지막에 넣으므로 기간의 semester_id 만 바뀌고 지기는 그대로다.
+			const result = await getJson('works', {
+				...drillParams(drill),
+				semester_id: String(previous.id)
+			});
+			if (requests.isLatest('previousDrill', id)) previousDrillWorks = result;
+		} catch (e) {
+			if (requests.isLatest('previousDrill', id))
+				console.error('통계 로딩 실패 (지난 학기 drill works)', e);
+		}
+	}
+	// 링크로 연 학기는 학기 목록이 온 뒤에야 앞 학기를 안다(요약의 previousId 와 같다).
+	$: if (drill && previousId !== previousDrillFor) loadPreviousDrill();
 
 	async function loadDrill() {
 		if (!drill || (scope === 'individual' && !userId)) return;
+		loadPreviousDrill();
 		const id = requests.begin(['drill']);
 		drillWorks = null;
 		drillLoading = true;
@@ -378,9 +404,10 @@
 	const openBar = (card, e) =>
 		openDrill(card, barItemIndex(e.detail.dataIndex, data[card]?.labels?.length ?? 0));
 	async function closeDrill() {
-		requests.begin(['drill']); // 진행 중인 응답은 버린다.
+		requests.begin(['drill', 'previousDrill']); // 진행 중인 응답은 버린다.
 		drill = null;
 		drillWorks = null;
+		previousDrillWorks = null;
 		syncUrl();
 		await tick();
 		if (drillOpener?.isConnected) drillOpener.focus();
@@ -861,6 +888,7 @@
 				<DrillPanel
 					target={drill}
 					works={drillWorks}
+					previous={previousDrillWorks}
 					loading={drillLoading}
 					error={drillError}
 					retry={loadDrill}
