@@ -62,6 +62,7 @@
 		evennessChangeText,
 		mixTable,
 		rankChangeTable,
+		firstIdSet,
 		firstsTable
 	} from '$lib/semesterReport.js';
 	import { hasPeriodStart, firstsSubtitle, firstsEmptyText } from '$lib/statFirsts.js';
@@ -536,8 +537,16 @@
 		genres &&
 		(previousGenres ? mixTable(genres, previousGenres, '장르') : shareTable(genres, '장르'));
 	// 많이 튼 표도 같다: 순위·이름·횟수(앞 학기가 있으면 지난 학기 열까지).
+	// 작곡가·곡은 처음 튼 목록이 오면 이 기간에 처음 튼 행을 '첫 선곡'으로 적는다.
 	$: composerTable =
-		composers && rankChangeTable(composers, previousRanks.composers, '작곡가', LIMITS.composers);
+		composers &&
+		rankChangeTable(
+			composers,
+			previousRanks.composers,
+			'작곡가',
+			LIMITS.composers,
+			firstIdSet(firstComposers)
+		);
 	$: soloistTable =
 		soloists && rankChangeTable(soloists, previousRanks.soloists, '연주자', LIMITS.soloists);
 	$: conductorTable =
@@ -546,7 +555,9 @@
 	$: orchestraTable =
 		orchestras &&
 		rankChangeTable(orchestras, previousRanks.orchestras, '오케스트라', LIMITS.orchestras);
-	$: worksTable = works && rankChangeTable(works, previousRanks.works, '곡', LIMITS.works);
+	$: worksTable =
+		works &&
+		rankChangeTable(works, previousRanks.works, '곡', LIMITS.works, firstIdSet(firstWorks));
 
 	// 다양성: 버킷 라벨, 선곡 수 막대, 다양성(고른정도) 추이.
 	$: bucketLabel = diversityBucket === 'week' ? '주별' : '월별';
