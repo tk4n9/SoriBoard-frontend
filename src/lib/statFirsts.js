@@ -12,15 +12,19 @@ export function hasPeriodStart({ period, start = '' }) {
 }
 
 // 카드 부제(표의 설명): '2025-2학기 · 전체 · 클럽에서 처음 튼 곡 18곡'. 불러오는 동안(firsts 가 없으면)
-// 개수를 붙이지 않는다.
+// 개수를 붙이지 않는다. 학기를 고르면 앞 학기의 같은 목록(previous)의 개수를 덧붙인다:
+// '… 18곡 · 지난 학기 12곡'. 앞 학기가 없거나 아직 없거나 실패했으면 붙이지 않는다.
 /**
  * @param {string} viewLabel
  * @param {{ items: unknown[] } | null | undefined} firsts
  * @param {string} noun
  * @param {string} unit
+ * @param {{ items: unknown[] } | null | undefined} [previous]
  */
-export function firstsSubtitle(viewLabel, firsts, noun, unit) {
-	const count = firsts ? ` ${firsts.items.length.toLocaleString()}${unit}` : '';
+export function firstsSubtitle(viewLabel, firsts, noun, unit, previous = null) {
+	const before =
+		firsts && previous ? ` · 지난 학기 ${previous.items.length.toLocaleString()}${unit}` : '';
+	const count = firsts ? ` ${firsts.items.length.toLocaleString()}${unit}${before}` : '';
 	const text = `클럽에서 처음 튼 ${noun}${count}`;
 	return viewLabel.trim() ? `${viewLabel.trim()} · ${text}` : text;
 }
