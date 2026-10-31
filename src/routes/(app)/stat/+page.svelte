@@ -339,8 +339,9 @@
 	// 그 기간·범위의 항목에 없으면 이름을 알 수 없으므로 열지 않고 URL에서도 지운다.
 	let linkedDrill = readDrillQuery($page.url.searchParams);
 	// 기간이 앞 학기가 있는 학기면 같은 대상·범위의 앞 학기 곡도 불러 패널의 표에 지난 학기 칸을 붙인다.
-	// 실패하면 콘솔에만 남기고 표는 지금과 같다.
+	// 실패하면 패널의 표 아래에 알리고, 그 '다시 시도'는 앞 학기만 다시 부른다.
 	let previousDrillWorks = null;
+	let previousDrillFailed = false;
 	let previousDrillFor = null; // 마지막으로 부른 앞 학기 id(없으면 null)
 
 	async function loadPreviousDrill() {
@@ -348,6 +349,7 @@
 		const previous = previousOf(period, semesters);
 		previousDrillFor = previous?.id ?? null;
 		previousDrillWorks = null;
+		previousDrillFailed = false;
 		if (!drill || !previous || (scope === 'individual' && !userId)) return;
 		try {
 			// buildQuery 는 extra 를 마지막에 넣으므로 기간의 semester_id 만 바뀌고 지기는 그대로다.
@@ -357,8 +359,10 @@
 			});
 			if (requests.isLatest('previousDrill', id)) previousDrillWorks = result;
 		} catch (e) {
-			if (requests.isLatest('previousDrill', id))
+			if (requests.isLatest('previousDrill', id)) {
 				console.error('통계 로딩 실패 (지난 학기 drill works)', e);
+				previousDrillFailed = true;
+			}
 		}
 	}
 	// 링크로 연 학기는 학기 목록이 온 뒤에야 앞 학기를 안다(요약의 previousId 와 같다).
@@ -408,6 +412,7 @@
 		drill = null;
 		drillWorks = null;
 		previousDrillWorks = null;
+		previousDrillFailed = false;
 		syncUrl();
 		await tick();
 		if (drillOpener?.isConnected) drillOpener.focus();
@@ -892,6 +897,8 @@
 					loading={drillLoading}
 					error={drillError}
 					retry={loadDrill}
+					previousError={previousDrillFailed ? semesterLabel(previousOf(period, semesters)) : ''}
+					retryPrevious={loadPreviousDrill}
 					scopeLabel={viewLabel}
 					{fileTag}
 					historyLink={drillHistoryLink}

@@ -22,6 +22,9 @@
 	export let workLink = null;
 	/** @type {(() => void) | null} */
 	export let retry = null; // 주면 불러오지 못한 패널에 '다시 시도' 단추가 보인다.
+	export let previousError = ''; // 불러오지 못한 앞 학기의 이름. 주면 표 아래에 알린다.
+	/** @type {(() => void) | null} */
+	export let retryPrevious = null; // 주면 그 알림에 앞 학기만 다시 부르는 '다시 시도' 단추가 보인다.
 	/** @type {string | string[]} */
 	export let fileTag = ''; // 내려받는 파일 이름에서 제목 뒤에 붙는 보기(기간, 지기 등, statFileName.js)
 
@@ -39,6 +42,10 @@
 	function onRetry() {
 		panel.focus();
 		retry();
+	}
+	function onRetryPrevious() {
+		panel.focus();
+		retryPrevious();
 	}
 
 	// 보이는 표 그대로(순위·곡·횟수, 지난 학기) 저장한다. 파일 이름은 카드의 CSV 저장과 같은 꼴.
@@ -96,6 +103,20 @@
 	</div>
 	{#if !loading && !error && table}
 		<DataTable {table} {title} {subtitle} {links} />
+		{#if previousError}
+			<p class="previous-error">
+				지난 학기({previousError}) 횟수를 불러오지 못했습니다.
+				{#if retryPrevious}
+					<button
+						class="tool-btn"
+						on:click={onRetryPrevious}
+						aria-label={`${title} 지난 학기 다시 시도`}
+					>
+						다시 시도
+					</button>
+				{/if}
+			</p>
+		{/if}
 	{:else}
 		<div class="panel-title">{title}</div>
 		<div class="panel-subtitle">{subtitle}</div>
@@ -184,5 +205,16 @@
 	.placeholder.error {
 		gap: 10px;
 		color: var(--secondary-secondary-800, #95560d);
+	}
+	/* 통계 KPI 칸 아래의 알림(.kpi-error)과 같은 글꼴·색 */
+	.previous-error {
+		margin: 8px 0 0;
+		text-align: center;
+		font-family: var(--small-medium-font-family, 'Noto Sans KR', sans-serif);
+		font-size: var(--small-medium-font-size, 13px);
+		color: var(--secondary-secondary-800, #95560d);
+	}
+	.previous-error .tool-btn {
+		margin-left: 8px;
 	}
 </style>
