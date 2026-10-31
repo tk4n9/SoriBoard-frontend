@@ -48,7 +48,7 @@
 		if (!res.ok) throw new Error(`${endpoint} ${res.status}`);
 		return res.json();
 	};
-	// 요약·상위 10·시대·장르는 지난 학기와 견준다(지난 학기가 없으면 previous 는 null).
+	// 요약·상위 10·시대·장르·처음 튼 작곡가·곡은 지난 학기와 견준다(지난 학기가 없으면 previous 는 null).
 	// 지난 학기만 실패하면 이 학기만으로 그리고, KPI 칸 아래 줄(previousFailed)이 그렇다고 알린다.
 	// 그 줄의 '다시 시도'(retryPrevious)는 실패한 카드의 지난 학기 쪽만 다시 부른다.
 	const withPrevious = async (endpoint, extra = {}) => {
@@ -74,15 +74,13 @@
 		eras: ['eras'],
 		genres: ['genres'],
 		// 선곡 다양성은 summary 만 쓴다. 월별 버킷이면 쓰지 않는 timeline 이 작다.
-		diversity: ['diversity', { bucket: 'month' }]
+		diversity: ['diversity', { bucket: 'month' }],
+		firstComposers: ['firsts', { kind: 'composer' }],
+		firstWorks: ['firsts', { kind: 'work' }]
 	};
-	const cardRequests = {
-		...Object.fromEntries(
-			Object.keys(compared).map((key) => [key, () => withPrevious(...compared[key])])
-		),
-		firstComposers: () => getJson('firsts', semester.id, { kind: 'composer' }),
-		firstWorks: () => getJson('firsts', semester.id, { kind: 'work' })
-	};
+	const cardRequests = Object.fromEntries(
+		Object.keys(compared).map((key) => [key, () => withPrevious(...compared[key])])
+	);
 	const CARD_KEYS = Object.keys(cardRequests);
 
 	/** @type {Record<string, any>} */
@@ -91,7 +89,12 @@
 	let loading = Object.fromEntries(CARD_KEYS.map((key) => [key, true]));
 	/** @type {Record<string, string>} */
 	let errors = {};
-	$: ({ eras, genres, firstComposers, firstWorks } = data);
+	$: ({ eras, genres } = data);
+	// 처음 튼 작곡가·곡: 이 학기의 목록과, 부제에 개수만 쓰는 지난 학기의 목록.
+	$: firstComposers = data.firstComposers?.current;
+	$: firstWorks = data.firstWorks?.current;
+	$: previousFirstComposers = data.firstComposers?.previous;
+	$: previousFirstWorks = data.firstWorks?.previous;
 	// 상위 10 은 이 학기의 목록을 그리고, 지난 학기의 목록과 견준 칸을 붙인다(rankChangeTable).
 	// 작곡가·곡은 처음 튼 목록이 오면 이 학기에 처음 튼 행을 '첫 선곡'으로 적는다.
 	$: composers = data.composers?.current;
@@ -362,19 +365,29 @@
 		diversityTile('장르 다양성', diversity?.genre, previousDiversity?.genre)
 	];
 
-	// 처음 튼 작곡가·곡: 클럽 전체에서 처음 튼 날이 이 학기인 것.
-	const firstsCard = (key, title, firsts, nameHeader, unit, semesterId) => ({
+	// 처음 튼 작곡가·곡: 클럽 전체에서 처음 튼 날이 이 학기인 것. 부제는 그 개수와, 지난 학기의
+	// 같은 목록(before)을 받았으면 그 개수(통계의 부제처럼 '… 18곡 · 지난 학기 12곡').
+	const firstsCard = (key, title, firsts, before, nameHeader, unit, semesterId) => ({
 		key,
 		title,
 		table: firsts?.items.length ? firstsTable(firsts, nameHeader) : null,
 		links: nameHeader === '작곡가' ? linksOf(firsts, semesterId) : workLinksOf(firsts, semesterId),
 		subtitle:
 			`클럽에서 이 학기에 처음 튼 ${nameHeader}` +
-			(firsts ? ` · ${firsts.items.length.toLocaleString()}${unit}` : '')
+			(firsts ? ` · ${firsts.items.length.toLocaleString()}${unit}` : '') +
+			(firsts && before ? ` · 지난 학기 ${before.items.length.toLocaleString()}${unit}` : '')
 	});
 	$: firstsCards = [
-		firstsCard('firstComposers', '처음 튼 작곡가', firstComposers, '작곡가', '명', semesterId),
-		firstsCard('firstWorks', '처음 튼 곡', firstWorks, '곡', '곡', semesterId)
+		firstsCard(
+			'firstComposers',
+			'처음 튼 작곡가',
+			firstComposers,
+			previousFirstComposers,
+			'작곡가',
+			'명',
+			semesterId
+		),
+		firstsCard('firstWorks', '처음 튼 곡', firstWorks, previousFirstWorks, '곡', '곡', semesterId)
 	];
 
 	// 'CSV 저장': 카드의 표를 보이는 그대로(횟수만 쉼표 없이) 내려받는다. 파일 이름은 통계처럼
