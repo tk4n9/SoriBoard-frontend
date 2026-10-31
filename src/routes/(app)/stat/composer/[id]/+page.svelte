@@ -45,7 +45,9 @@
 		composerFacts,
 		composerTimelineBucket,
 		composerWorksTable,
-		composerWorksCsv
+		composerWorksCsv,
+		composerIsWholeRecord,
+		composerWholeDates
 	} from '$lib/composerStats.js';
 
 	// 작곡가 한 명의 기록, 고른 기간·지기만(기본값은 전체 기간·전체 지기). 카드는 따로 불러오고,
@@ -141,6 +143,23 @@
 			});
 	}
 
+	// 기본값(전체 기간·전체 지기)이 아니면 처음·마지막 튼 날 칸 아래에 둘 이 작곡가의 전체 기록(기간·지기 없는
+	// stats/summary). 카드가 아니다: loadCard 는 머리말의 기간(appliedFilters)을 응답의 filters 로 바꾼다.
+	let wholeSummary = null;
+	let wholeError = false;
+	async function loadWhole(id, gen) {
+		try {
+			const res = await fetch(`/api/stats/summary?composer_id=${id}`);
+			if (!res.ok) throw new Error(`summary ${res.status}`);
+			const result = await res.json();
+			if (gen === cardGeneration) wholeSummary = result;
+		} catch (e) {
+			if (gen !== cardGeneration) return;
+			console.error('작곡가 통계 로딩 실패 (전체 기록)', e);
+			wholeError = true;
+		}
+	}
+
 	// 카드만 다시 부른다(기간이나 지기가 바뀌면 작곡가 정보는 그대로다).
 	function loadCards() {
 		const id = readComposerId($page.params.id);
@@ -148,11 +167,17 @@
 		data = {};
 		errors = {};
 		appliedFilters = null;
+		wholeSummary = null;
+		wholeError = false;
 		timelineBucket = nextTimelineBucket();
 		loading = Object.fromEntries(CARD_KEYS.map((key) => [key, Boolean(id)]));
 		loadPreviousSummary();
 		if (!id) return;
 		for (const key of CARD_KEYS) loadCard(key, id, gen);
+		// filter 는 아직 이전 값일 수 있으므로 기간·지기 변수를 바로 쓴다(nextTimelineBucket 과 같다).
+		if (!composerIsWholeRecord({ period, start: customStart, end: customEnd, userId })) {
+			loadWhole(id, gen);
+		}
 	}
 
 	// '다시 시도': 그 카드만 지금 기간으로 다시 부른다. cardGeneration 은 그대로 두어 다른 카드의 요청을
@@ -164,6 +189,11 @@
 		loading[key] = true;
 		errors[key] = '';
 		loadCard(key, composerId, cardGeneration);
+	}
+	function retryWhole(e) {
+		if (document.activeElement === e.currentTarget) heading?.focus();
+		wholeError = false;
+		loadWhole(composerId, cardGeneration);
 	}
 	function retryComposer(e) {
 		if (document.activeElement === e.currentTarget) heading?.focus();
@@ -398,6 +428,8 @@
 			(period === ALL && !userId ? '' : ' · 처음·마지막은 전체 기록 기준')
 		: '';
 	$: count = (v) => (v == null ? '—' : v.toLocaleString());
+	// 처음·마지막 튼 날 칸 아래의 '전체 기록 YYYY-MM-DD'(전체 기간·전체 지기면 null).
+	$: wholeDates = composerWholeDates(filter, wholeSummary);
 	// 머리글의 선곡 기록 링크와 총 선곡 숫자는 같은 목록(이 작곡가, 같은 기간·지기)을 연다.
 	$: historyLink = composerHistoryHref(composerId, [], filter);
 </script>
@@ -509,10 +541,12 @@
 			<div class="kpi">
 				<div class="kpi-value small">{summary?.date_start ?? '—'}</div>
 				<div class="kpi-label">처음 튼 날</div>
+				{#if wholeDates?.start}<div class="kpi-change">{wholeDates.start}</div>{/if}
 			</div>
 			<div class="kpi">
 				<div class="kpi-value small">{summary?.date_end ?? '—'}</div>
 				<div class="kpi-label">마지막으로 튼 날</div>
+				{#if wholeDates?.end}<div class="kpi-change">{wholeDates.end}</div>{/if}
 			</div>
 		</div>
 		{#if errors.summary}
@@ -532,6 +566,14 @@
 			<p class="kpi-error">
 				지난 학기({semesterLabel(previousTarget)})와 견준 수치를 불러오지 못했습니다.
 				<button class="tool-btn" on:click={retryPrevious} aria-label="지난 학기 수치 다시 시도">
+					다시 시도
+				</button>
+			</p>
+		{/if}
+		{#if wholeError}
+			<p class="kpi-error">
+				전체 기록의 처음·마지막 날을 불러오지 못했습니다.
+				<button class="tool-btn" on:click={retryWhole} aria-label="전체 기록 다시 시도">
 					다시 시도
 				</button>
 			</p>
