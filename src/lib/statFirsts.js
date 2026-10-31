@@ -28,3 +28,16 @@ export function firstsSubtitle(viewLabel, firsts, noun, unit, previous = null) {
 	const text = `클럽에서 처음 튼 ${noun}${count}`;
 	return viewLabel.trim() ? `${viewLabel.trim()} · ${text}` : text;
 }
+
+// 목록을 불러왔는데 비었을 때 카드의 자리 문구: '처음 튼 곡 — 이 기간에는 없습니다'. 표가 없으면 부제도
+// 보이지 않으므로, 앞 학기의 같은 목록(previous)이 있으면 그 개수를 여기에 덧붙인다:
+// '… · 지난 학기 12곡'. 앞 학기가 없거나 아직 없거나 실패했으면 붙이지 않는다.
+/**
+ * @param {string} title
+ * @param {string} unit
+ * @param {{ items: unknown[] } | null | undefined} [previous]
+ */
+export function firstsEmptyText(title, unit, previous = null) {
+	const before = previous ? ` · 지난 학기 ${previous.items.length.toLocaleString()}${unit}` : '';
+	return `${title} — 이 기간에는 없습니다${before}`;
+}

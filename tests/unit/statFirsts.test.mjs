@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { hasPeriodStart, firstsSubtitle } from '../../src/lib/statFirsts.js';
+import { hasPeriodStart, firstsSubtitle, firstsEmptyText } from '../../src/lib/statFirsts.js';
 
 test('a view has a period start for a 학기, and for 이번 학기 or 직접 지정 with a start', () => {
 	assert.equal(hasPeriodStart({ period: 'current', start: '2026-09-01' }), true);
@@ -79,5 +79,27 @@ test('the previous count waits for this 학기 count and is left out when missin
 	assert.equal(
 		firstsSubtitle('2025-2학기 · 전체', items(18), '곡', '곡', undefined),
 		'2025-2학기 · 전체 · 클럽에서 처음 튼 곡 18곡'
+	);
+});
+
+test('an empty list says there is none in this period, with the previous 학기 count when given', () => {
+	const items = (n) => ({ items: Array.from({ length: n }, (_, i) => ({ id: i })) });
+	assert.equal(firstsEmptyText('처음 튼 곡', '곡'), '처음 튼 곡 — 이 기간에는 없습니다');
+	assert.equal(firstsEmptyText('처음 튼 곡', '곡', null), '처음 튼 곡 — 이 기간에는 없습니다');
+	assert.equal(
+		firstsEmptyText('처음 튼 작곡가', '명', undefined),
+		'처음 튼 작곡가 — 이 기간에는 없습니다'
+	);
+	assert.equal(
+		firstsEmptyText('처음 튼 곡', '곡', items(12)),
+		'처음 튼 곡 — 이 기간에는 없습니다 · 지난 학기 12곡'
+	);
+	assert.equal(
+		firstsEmptyText('처음 튼 곡', '곡', items(0)),
+		'처음 튼 곡 — 이 기간에는 없습니다 · 지난 학기 0곡'
+	);
+	assert.equal(
+		firstsEmptyText('처음 튼 작곡가', '명', items(1234)),
+		'처음 튼 작곡가 — 이 기간에는 없습니다 · 지난 학기 1,234명'
 	);
 });
