@@ -345,8 +345,7 @@
 	$: tileChanges = Object.fromEntries(
 		Object.entries({
 			era: evennessChangeText(groupEvenness(tiles?.era), groupEvenness(previousTiles?.era)),
-			genre: evennessChangeText(groupEvenness(tiles?.genre), groupEvenness(previousTiles?.genre)),
-			distinct_works: kpiChangeText(tiles?.distinct_works, previousTiles?.distinct_works)
+			genre: evennessChangeText(groupEvenness(tiles?.genre), groupEvenness(previousTiles?.genre))
 		}).map(([key, text]) => {
 			const [diff, before] = text.split(' · ');
 			return [key, text ? { diff, before } : null];
@@ -999,6 +998,7 @@
 			</div>
 		</div>
 
+		<!-- 고유 곡 수는 위의 곡 칸과 같아(같은 선곡의 서로 다른 곡 수) 두지 않는다(학기 결산과 같다) -->
 		<div class="kpi-row diversity-kpi" bind:this={tilesRow} tabindex="-1">
 			<div class="kpi">
 				<div class="kpi-value">{tiles ? pct(groupEvenness(tiles.era)) : '—'}</div>
@@ -1017,18 +1017,6 @@
 					<div class="kpi-change">
 						<span>{tileChanges.genre.diff} ·</span>
 						<span>{tileChanges.genre.before}</span>
-					</div>
-				{/if}
-			</div>
-			<div class="kpi">
-				<div class="kpi-value">
-					{tiles ? tiles.distinct_works.toLocaleString() : '—'}
-				</div>
-				<div class="kpi-label">고유 곡 수</div>
-				{#if tileChanges.distinct_works}
-					<div class="kpi-change">
-						<span>{tileChanges.distinct_works.diff} ·</span>
-						<span>{tileChanges.distinct_works.before}</span>
 					</div>
 				{/if}
 			</div>
@@ -1287,6 +1275,6 @@
 		color: var(--action-fg);
 	}
 	.diversity-kpi {
-		grid-template-columns: repeat(3, 1fr);
+		grid-template-columns: repeat(2, 1fr);
 	}
 </style>
