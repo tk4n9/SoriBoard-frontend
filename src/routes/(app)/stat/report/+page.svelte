@@ -21,6 +21,7 @@
 		mixTable,
 		mixSubtitle,
 		rankChangeTable,
+		firstIdSet,
 		loadWithPrevious,
 		firstsTable,
 		reportRangeText,
@@ -92,6 +93,7 @@
 	let errors = {};
 	$: ({ eras, genres, firstComposers, firstWorks } = data);
 	// 상위 10 은 이 학기의 목록을 그리고, 지난 학기의 목록과 견준 칸을 붙인다(rankChangeTable).
+	// 작곡가·곡은 처음 튼 목록이 오면 이 학기에 처음 튼 행을 '첫 선곡'으로 적는다.
 	$: composers = data.composers?.current;
 	$: soloists = data.soloists?.current;
 	$: works = data.works?.current;
@@ -271,7 +273,13 @@
 			key: 'composers',
 			title: '많이 튼 작곡가',
 			table: composers?.labels.length
-				? rankChangeTable(composers, data.composers.previous, '작곡가')
+				? rankChangeTable(
+						composers,
+						data.composers.previous,
+						'작곡가',
+						10,
+						firstIdSet(firstComposers)
+					)
 				: null,
 			links: linksOf(composers, semesterId)
 		},
@@ -286,7 +294,9 @@
 		{
 			key: 'works',
 			title: '많이 튼 곡',
-			table: works?.labels.length ? rankChangeTable(works, data.works.previous, '곡') : null,
+			table: works?.labels.length
+				? rankChangeTable(works, data.works.previous, '곡', 10, firstIdSet(firstWorks))
+				: null,
 			links: workLinksOf(works, semesterId),
 			wide: true
 		},
