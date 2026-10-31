@@ -12,7 +12,14 @@
 	import { memberFileText, downloadName } from '$lib/statFileName.js';
 	import { todayStamp } from '$lib/csv.js';
 	import { downloadCsvTable, tableCsv } from '$lib/csvTable.js';
-	import { ALL, CURRENT, CUSTOM, periodRangeText, currentSemesterRange } from '$lib/statPeriod.js';
+	import {
+		ALL,
+		CURRENT,
+		CUSTOM,
+		periodRangeText,
+		currentSemesterRange,
+		semesterLabel
+	} from '$lib/statPeriod.js';
 	import { semesterRangeOf, timelineBucketName, timelineView } from '$lib/statBucket.js';
 	import { previousSemester, kpiChangeText, rankChangeTable } from '$lib/semesterReport.js';
 	import {
@@ -198,48 +205,79 @@
 	let semesters = [];
 
 	// 기간이 목록의 학기면 총 선곡·타임·곡 칸 아래에 바로 앞 학기와 견준 줄을 둔다(통계와 같다).
-	// 앞 학기의 요약은 같은 작곡가·지기·견습 포함으로 카드와 함께 부르고, 실패하면 줄만 없다.
+	// 앞 학기의 요약은 같은 작곡가·지기·견습 포함으로 카드와 함께 부르고, 실패하면 줄이 없다.
 	// 많이 튼 독주자·지휘자 표에는 앞 학기 같은 길이의 목록에서의 순위를 붙인다(통계와 같다).
 	// 많이 튼 곡 표에는 앞 학기에 튼 횟수를 붙인다(같은 WORKS_LIMIT 의 목록).
-	// 실패하면 그 표만 지금과 같다.
+	// 실패하면 그 표는 지금과 같다. 앞 학기의 요청이 하나라도 실패하면 KPI 칸 아래에 그 학기를 밝히고,
+	// 실패한 요청만 다시 부르게 한다(통계와 같다).
 	let previousSummary = null;
 	/** @type {Record<string, any>} 앞 학기의 독주자·지휘자 목록(LIMITS 의 키) */
 	let previousRanks = {};
 	let previousWorks = null; // 앞 학기의 곡 목록
 	let previousAsked = null; // 마지막으로 부른 앞 학기 id(없으면 null)
-	let previousGeneration = 0;
+	let previousTarget = null; // 마지막으로 부른 앞 학기
+	let previousComposerId = null; // 그때의 작곡가(다시 시도도 같은 작곡가로 부른다)
+	let previousGeneration = 0; // 이전 보기의 늦은 응답은 버린다.
+	/** @type {string[]} 실패한 앞 학기 요청(엔드포인트). KPI 칸 아래에 다시 시도와 함께 알린다. */
+	let previousFailed = [];
 	const previousOf = (p, list) => {
 		const chosen = list.find((s) => String(s.id) === p);
 		return chosen ? previousSemester(chosen, list) : null;
 	};
+	const previousRequests = {
+		summary: { apply: (result) => (previousSummary = result) },
+		works: {
+			apply: (result) => (previousWorks = result),
+			extra: { limit: String(WORKS_LIMIT) }
+		},
+		...Object.fromEntries(
+			Object.entries(LIMITS).map(([key, limit]) => [
+				key,
+				{
+					apply: (result) => (previousRanks = { ...previousRanks, [key]: result }),
+					extra: { limit: String(limit) }
+				}
+			])
+		)
+	};
+	async function askPrevious(endpoint) {
+		const gen = previousGeneration;
+		const { apply, extra = {} } = previousRequests[endpoint];
+		try {
+			// getJson 은 extra 를 마지막에 넣으므로 기간의 semester_id 만 바뀌고 지기는 그대로다.
+			const result = await getJson(endpoint, previousComposerId, {
+				...extra,
+				semester_id: String(previousTarget.id)
+			});
+			if (gen === previousGeneration) apply(result);
+		} catch (e) {
+			if (gen === previousGeneration) {
+				console.error(`작곡가 통계 로딩 실패 (지난 학기 ${endpoint})`, e);
+				previousFailed = [...previousFailed, endpoint];
+			}
+		}
+	}
 	async function loadPreviousSummary() {
 		const id = readComposerId($page.params.id);
-		const gen = ++previousGeneration; // 이전 보기의 늦은 응답은 버린다.
+		++previousGeneration;
 		const previous = previousOf(period, semesters);
 		previousAsked = previous?.id ?? null;
+		previousTarget = previous;
+		previousComposerId = id;
+		previousFailed = [];
 		previousSummary = null;
 		previousRanks = {};
 		previousWorks = null;
 		if (!previous || !id) return;
-		const ask = async (endpoint, apply, extra = {}) => {
-			try {
-				// getJson 은 extra 를 마지막에 넣으므로 기간의 semester_id 만 바뀌고 지기는 그대로다.
-				const result = await getJson(endpoint, id, { ...extra, semester_id: String(previous.id) });
-				if (gen === previousGeneration) apply(result);
-			} catch (e) {
-				if (gen === previousGeneration)
-					console.error(`작곡가 통계 로딩 실패 (지난 학기 ${endpoint})`, e);
-			}
-		};
-		await Promise.allSettled([
-			ask('summary', (result) => (previousSummary = result)),
-			ask('works', (result) => (previousWorks = result), { limit: String(WORKS_LIMIT) }),
-			...Object.entries(LIMITS).map(([key, limit]) =>
-				ask(key, (result) => (previousRanks = { ...previousRanks, [key]: result }), {
-					limit: String(limit)
-				})
-			)
-		]);
+		await Promise.allSettled(Object.keys(previousRequests).map(askPrevious));
+	}
+	// 지난 학기 수치의 '다시 시도': 실패한 요청만 같은 previousGeneration 으로 다시 부른다. 새로 올리면 아직
+	// 오지 않은 첫 요청의 응답까지 버려진다. 단추는 사라지므로 포커스는 h1 으로 옮긴다(retryComposer 와 같다).
+	function retryPrevious(e) {
+		if (document.activeElement === e.currentTarget) heading?.focus();
+		const failed = previousFailed;
+		previousFailed = [];
+		return Promise.allSettled(failed.map(askPrevious));
 	}
 	// 링크로 연 학기는 학기 목록이 온 뒤에야 앞 학기를 안다. 기간·지기·작곡가가 바뀔 때는 loadCards 가
 	// 이미 불렀으므로, 앞 학기가 마지막으로 부른 것과 다를 때만 부른다.
@@ -454,6 +492,15 @@
 					on:click={(e) => retry('summary', e, heading)}
 					aria-label="요약 다시 시도"
 				>
+					다시 시도
+				</button>
+			</p>
+		{/if}
+		<!-- 요약의 '다시 시도'는 앞 학기를 다시 부르지 않으므로, 요약이 실패했어도 이 줄은 따로 둔다 -->
+		{#if previousFailed.length}
+			<p class="kpi-error">
+				지난 학기({semesterLabel(previousTarget)})와 견준 수치를 불러오지 못했습니다.
+				<button class="tool-btn" on:click={retryPrevious} aria-label="지난 학기 수치 다시 시도">
 					다시 시도
 				</button>
 			</p>
