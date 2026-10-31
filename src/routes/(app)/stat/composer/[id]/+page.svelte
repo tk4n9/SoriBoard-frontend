@@ -5,8 +5,8 @@
 	import DataTable from '$lib/components/stat/DataTable.svelte';
 	import PeriodSelect from '$lib/components/stat/PeriodSelect.svelte';
 	import MemberSelect from '$lib/components/stat/MemberSelect.svelte';
-	import { horizontalBarOption, countBarOption } from '$lib/chartOptions.js';
-	import { placeholderText } from '$lib/statTable.js';
+	import { horizontalBarOption, countBarOption, eraPieOption } from '$lib/chartOptions.js';
+	import { placeholderText, shareTable } from '$lib/statTable.js';
 	import { WORKS_LIMIT, barItemIndex } from '$lib/statDrill.js';
 	import { pageTitle } from '$lib/statTitle.js';
 	import { memberFileText, downloadName } from '$lib/statFileName.js';
@@ -21,7 +21,12 @@
 		semesterLabel
 	} from '$lib/statPeriod.js';
 	import { semesterRangeOf, timelineBucketName, timelineView } from '$lib/statBucket.js';
-	import { previousSemester, kpiChangeText, rankChangeTable } from '$lib/semesterReport.js';
+	import {
+		previousSemester,
+		kpiChangeText,
+		rankChangeTable,
+		mixTable
+	} from '$lib/semesterReport.js';
 	import { catalogHref } from '$lib/composerCatalog.js';
 	import {
 		readComposerId,
@@ -70,14 +75,16 @@
 	const nextTimelineBucket = () =>
 		composerTimelineBucket({ period, start: customStart, end: customEnd }, current);
 	let timelineBucket = nextTimelineBucket();
-	// 독주자·지휘자 목록의 길이. 앞 학기의 목록도 같은 길이로 부른다(지난 학기 칸의 '10위 밖').
-	const LIMITS = { soloists: 10, conductors: 10 };
+	// 독주자·지휘자·오케스트라 목록의 길이. 앞 학기의 목록도 같은 길이로 부른다(지난 학기 칸의 '10위 밖').
+	const LIMITS = { soloists: 10, conductors: 10, orchestras: 10 };
 	const cardRequests = {
 		summary: (id) => getJson('summary', id),
 		timeline: (id) => getJson('timeline', id, { bucket: timelineBucket }),
 		works: (id) => getJson('works', id, { limit: String(WORKS_LIMIT) }),
 		soloists: (id) => getJson('soloists', id, { limit: String(LIMITS.soloists) }),
-		conductors: (id) => getJson('conductors', id, { limit: String(LIMITS.conductors) })
+		conductors: (id) => getJson('conductors', id, { limit: String(LIMITS.conductors) }),
+		orchestras: (id) => getJson('orchestras', id, { limit: String(LIMITS.orchestras) }),
+		genres: (id) => getJson('genres', id)
 	};
 	const CARD_KEYS = Object.keys(cardRequests);
 
@@ -90,7 +97,7 @@
 	let loading = Object.fromEntries(CARD_KEYS.map((key) => [key, true]));
 	/** @type {Record<string, string>} */
 	let errors = {};
-	$: ({ summary, timeline, works, soloists, conductors } = data);
+	$: ({ summary, timeline, works, soloists, conductors, orchestras, genres } = data);
 
 	// 백엔드가 적용했다고 돌려준 기간(filters). 기간이 바뀔 때 비운다.
 	let appliedFilters = null;
@@ -207,14 +214,16 @@
 
 	// 기간이 목록의 학기면 총 선곡·타임·곡 칸 아래에 바로 앞 학기와 견준 줄을 둔다(통계와 같다).
 	// 앞 학기의 요약은 같은 작곡가·지기·견습 포함으로 카드와 함께 부르고, 실패하면 줄이 없다.
-	// 많이 튼 독주자·지휘자 표에는 앞 학기 같은 길이의 목록에서의 순위를 붙인다(통계와 같다).
+	// 많이 튼 독주자·지휘자·오케스트라 표에는 앞 학기 같은 길이의 목록에서의 순위를 붙인다(통계와 같다).
 	// 많이 튼 곡 표에는 앞 학기에 튼 횟수를 붙인다(같은 WORKS_LIMIT 의 목록).
+	// 장르별 분포 표에는 앞 학기의 비율과 변화를 붙인다(통계와 같다).
 	// 실패하면 그 표는 지금과 같다. 앞 학기의 요청이 하나라도 실패하면 KPI 칸 아래에 그 학기를 밝히고,
 	// 실패한 요청만 다시 부르게 한다(통계와 같다).
 	let previousSummary = null;
-	/** @type {Record<string, any>} 앞 학기의 독주자·지휘자 목록(LIMITS 의 키) */
+	/** @type {Record<string, any>} 앞 학기의 독주자·지휘자·오케스트라 목록(LIMITS 의 키) */
 	let previousRanks = {};
 	let previousWorks = null; // 앞 학기의 곡 목록
+	let previousGenres = null; // 앞 학기의 장르별 분포
 	let previousAsked = null; // 마지막으로 부른 앞 학기 id(없으면 null)
 	let previousTarget = null; // 마지막으로 부른 앞 학기
 	let previousComposerId = null; // 그때의 작곡가(다시 시도도 같은 작곡가로 부른다)
@@ -231,6 +240,7 @@
 			apply: (result) => (previousWorks = result),
 			extra: { limit: String(WORKS_LIMIT) }
 		},
+		genres: { apply: (result) => (previousGenres = result) },
 		...Object.fromEntries(
 			Object.entries(LIMITS).map(([key, limit]) => [
 				key,
@@ -269,6 +279,7 @@
 		previousSummary = null;
 		previousRanks = {};
 		previousWorks = null;
+		previousGenres = null;
 		if (!previous || !id) return;
 		await Promise.allSettled(Object.keys(previousRequests).map(askPrevious));
 	}
@@ -337,12 +348,22 @@
 		soloists && horizontalBarOption(soloists, '많이 튼 독주자', subtitleFor(soloists));
 	$: conductorOpt =
 		conductors && horizontalBarOption(conductors, '많이 튼 지휘자', subtitleFor(conductors));
+	$: orchestraOpt =
+		orchestras && horizontalBarOption(orchestras, '많이 튼 오케스트라', subtitleFor(orchestras));
+	$: genreOpt = genres && eraPieOption(genres, '장르별 분포', subtitleFor(genres));
 	// 표로 보기와 CSV 저장은 같은 표다(순위·이름·횟수, 학기를 고르면 지난 학기).
 	$: soloistTable =
 		soloists && rankChangeTable(soloists, previousRanks.soloists, '연주자', LIMITS.soloists);
 	$: conductorTable =
 		conductors &&
 		rankChangeTable(conductors, previousRanks.conductors, '지휘자', LIMITS.conductors);
+	$: orchestraTable =
+		orchestras &&
+		rankChangeTable(orchestras, previousRanks.orchestras, '오케스트라', LIMITS.orchestras);
+	// 장르는 장르·횟수·비율(학기를 고르면 지난 학기·변화까지, 통계와 같다).
+	$: genreTable =
+		genres &&
+		(previousGenres ? mixTable(genres, previousGenres, '장르') : shareTable(genres, '장르'));
 	$: worksTable =
 		works && works.items.length > 0 && composerWorksTable(works, composer, previousWorks);
 	// 많이 튼 곡의 CSV 저장: 차트 카드(ChartCard)처럼, 표가 보일 때만 그 곡들을 받는다.
@@ -358,9 +379,10 @@
 	}
 	// 링크는 모두 같은 기간·지기를 연다. 곡 이름은 그 곡의 선곡 기록으로 간다.
 	$: worksLinks = works ? works.items.map((item) => composerWorkHref(item.id, filter)) : [];
-	// 독주자·지휘자는 이 작곡가의 곡을 그 사람과 튼 선곡 기록으로 간다(표의 이름, 차트의 막대).
+	// 독주자·지휘자·오케스트라는 이 작곡가의 곡을 그 사람(악단)과 튼 선곡 기록으로 간다(표의 이름, 차트의 막대).
 	$: soloistLinks = composerRankLinks(composerId, 'soloists', soloists, filter);
 	$: conductorLinks = composerRankLinks(composerId, 'conductors', conductors, filter);
+	$: orchestraLinks = composerRankLinks(composerId, 'orchestras', orchestras, filter);
 	// 학기·달마다 그 학기·달에 이 작곡가의 곡을 튼 선곡 기록으로 간다(기간 밖의 날짜는 뺀다).
 	$: semesterLinks = composerSemesterLinks(composerId, timeline, semesters, filter);
 	// 막대의 dataIndex 는 뒤집힌 순서다(horizontalBarOption). 학기별·월별 선곡은 뒤집지 않는다.
@@ -598,6 +620,33 @@
 					links={conductorLinks}
 					on:itemclick={(e) => openBar(conductorLinks, e)}
 					csvHeaders={['지휘자', '횟수']}
+				/>
+				<ChartCard
+					title="많이 튼 오케스트라"
+					option={orchestraOpt}
+					data={orchestras}
+					loading={loading.orchestras}
+					error={errors.orchestras}
+					retry={() => retry('orchestras')}
+					{fileTag}
+					table={orchestraTable}
+					csv={orchestraTable && tableCsv(orchestraTable)}
+					links={orchestraLinks}
+					on:itemclick={(e) => openBar(orchestraLinks, e)}
+					csvHeaders={['오케스트라', '횟수']}
+				/>
+				<!-- 장르는 링크가 없다(통계와 같다) -->
+				<ChartCard
+					title="장르별 분포"
+					option={genreOpt}
+					data={genres}
+					loading={loading.genres}
+					error={errors.genres}
+					retry={() => retry('genres')}
+					{fileTag}
+					table={genreTable}
+					csv={genreTable && tableCsv(genreTable)}
+					csvHeaders={['장르', '횟수']}
 				/>
 			</div>
 		{/if}

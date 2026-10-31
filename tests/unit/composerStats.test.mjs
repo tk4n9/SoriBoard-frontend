@@ -66,6 +66,10 @@ test('links: a 독주자 or 지휘자 with this composer, by id', () => {
 	assert.deepEqual(composerRankLinks(7, 'soloists', { items: [{ id: 2, name: 'a' }] }), [
 		'/stat/history?period=all&composer_id=7&player_id=2'
 	]);
+	// 많이 튼 오케스트라: 이 작곡가의 곡을 그 악단과 튼 선곡 기록.
+	assert.deepEqual(composerRankLinks(7, 'orchestras', { items: [{ id: 3, name: 'o' }] }), [
+		'/stat/history?period=all&composer_id=7&orchestra_id=3'
+	]);
 });
 
 test('links: nothing before the card loads, none for a card without an id filter', () => {
