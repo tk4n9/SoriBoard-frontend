@@ -4,7 +4,7 @@
 // (user_id, include_mentees)로 두고, 기본값(전체 지기)은 남기지 않는다. 링크는 모두 그 기간·지기를 연다.
 import { CURRENT, ALL, CUSTOM, readStatPeriod, readStatRange } from './statPeriod.js';
 import { historyHref, bucketHistoryLinks, statHref } from './playHistory.js';
-import { DRILL_CARDS } from './statDrill.js';
+import { DRILL_CARDS, WORKS_LIMIT } from './statDrill.js';
 import { competitionRanks, formatCount } from './statTable.js';
 import { periodTitle } from './statTitle.js';
 import { spansSemesters } from './statBucket.js';
@@ -242,50 +242,74 @@ export function composerWorkName(item, composer) {
 	return item.name;
 }
 
-// 곡 표: 순위, 곡, 횟수, 처음 튼 날, 마지막으로 튼 날(날짜는 기간과 상관없이 그 곡의 전체 선곡 기준).
+// 지난 학기 칸: 그 곡을 앞 학기에 튼 횟수(이름이 아니라 id 로 맞춘다). 앞 학기 목록에 없으면 0.
+// 단, 앞 학기 목록이 WORKS_LIMIT 에서 잘렸으면 없는 곡의 횟수는 알 수 없다(null: 표는 '—', CSV 는 빈칸).
 /**
- * @param {{ items: { name: string, count: number, composer_id?: number | null,
+ * @param {{ items: { id: number, count: number }[] }} previous
+ * @param {number} id
+ * @returns {number | null}
+ */
+export function previousWorkCount(previous, id) {
+	const found = previous.items.find((item) => item.id === id);
+	if (found) return found.count;
+	return previous.items.length >= WORKS_LIMIT ? null : 0;
+}
+
+// 곡 표: 순위, 곡, 횟수, 처음 튼 날, 마지막으로 튼 날(날짜는 기간과 상관없이 그 곡의 전체 선곡 기준).
+// 앞 학기의 목록(previous)을 주면 마지막에 지난 학기 칸을 둔다. 없으면(null) 칸을 두지 않는다.
+/**
+ * @param {{ items: { id: number, name: string, count: number, composer_id?: number | null,
  *   first_played?: string | null, last_played?: string | null }[] }} works
  * @param {{ id: number, name: string } | null} composer
+ * @param {{ items: { id: number, count: number }[] } | null} [previous]
  * @returns {import('./statTable.js').Table}
  */
-export function composerWorksTable(works, composer) {
+export function composerWorksTable(works, composer, previous = null) {
 	const ranks = competitionRanks(works.items.map((item) => item.count));
+	const columns = [
+		{ name: '순위', numeric: true },
+		{ name: '곡' },
+		{ name: '횟수', numeric: true },
+		{ name: '처음', numeric: true },
+		{ name: '마지막', numeric: true }
+	];
 	return {
-		columns: [
-			{ name: '순위', numeric: true },
-			{ name: '곡' },
-			{ name: '횟수', numeric: true },
-			{ name: '처음', numeric: true },
-			{ name: '마지막', numeric: true }
-		],
+		columns: previous ? [...columns, { name: '지난 학기', numeric: true }] : columns,
 		rowHeader: 1,
-		rows: works.items.map((item, i) => [
-			String(ranks[i]),
-			composer ? composerWorkName(item, composer) : item.name,
-			formatCount(item.count),
-			item.first_played ?? '—',
-			item.last_played ?? '—'
-		])
+		rows: works.items.map((item, i) => {
+			const row = [
+				String(ranks[i]),
+				composer ? composerWorkName(item, composer) : item.name,
+				formatCount(item.count),
+				item.first_played ?? '—',
+				item.last_played ?? '—'
+			];
+			return previous ? [...row, formatCount(previousWorkCount(previous, item.id))] : row;
+		})
 	};
 }
 
 // 곡 표의 CSV(csvTable.js): 곡, 횟수, 처음, 마지막. 순위는 빼고(차트 카드의 CSV 처럼) 횟수는 숫자 그대로,
-// 날짜는 YYYY-MM-DD, 없으면 빈칸.
+// 날짜는 YYYY-MM-DD, 없으면 빈칸. previous 를 주면 지난 학기(숫자, 알 수 없으면 빈칸)도 둔다(표와 같다).
 /**
- * @param {{ items: { name: string, count: number, composer_id?: number | null,
+ * @param {{ items: { id: number, name: string, count: number, composer_id?: number | null,
  *   first_played?: string | null, last_played?: string | null }[] }} works
  * @param {{ id: number, name: string } | null} composer
+ * @param {{ items: { id: number, count: number }[] } | null} [previous]
  * @returns {{ headers: string[], rows: unknown[][] }}
  */
-export function composerWorksCsv(works, composer) {
+export function composerWorksCsv(works, composer, previous = null) {
+	const headers = ['곡', '횟수', '처음', '마지막'];
 	return {
-		headers: ['곡', '횟수', '처음', '마지막'],
-		rows: works.items.map((item) => [
-			composer ? composerWorkName(item, composer) : item.name,
-			item.count,
-			item.first_played ?? '',
-			item.last_played ?? ''
-		])
+		headers: previous ? [...headers, '지난 학기'] : headers,
+		rows: works.items.map((item) => {
+			const row = [
+				composer ? composerWorkName(item, composer) : item.name,
+				item.count,
+				item.first_played ?? '',
+				item.last_played ?? ''
+			];
+			return previous ? [...row, previousWorkCount(previous, item.id) ?? ''] : row;
+		})
 	};
 }

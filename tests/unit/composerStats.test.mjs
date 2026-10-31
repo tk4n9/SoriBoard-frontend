@@ -19,10 +19,12 @@ import {
 	composerTimelineBucket,
 	composerWorkName,
 	composerWorksTable,
-	composerWorksCsv
+	composerWorksCsv,
+	previousWorkCount
 } from '../../src/lib/composerStats.js';
 import { readHistoryQuery, workHistoryHref } from '../../src/lib/playHistory.js';
 import { toCsvTable } from '../../src/lib/csvTable.js';
+import { WORKS_LIMIT } from '../../src/lib/statDrill.js';
 
 test('the route id must be a positive integer', () => {
 	assert.equal(readComposerId('12'), '12');
@@ -179,6 +181,98 @@ test('the works CSV has one row per work: name, count, first and last play, no r
 		['C - 가', 'C - 나, "작품 2"', 'D - 다']
 	);
 	assert.deepEqual(composerWorksCsv({ items: [] }, null).rows, []);
+});
+
+test('previousWorkCount: the count by id, 0 when absent, unknown when the list was cut', () => {
+	const previous = {
+		items: [
+			{ id: 7, count: 4 },
+			{ id: 8, count: 1 }
+		]
+	};
+	assert.equal(previousWorkCount(previous, 7), 4);
+	assert.equal(previousWorkCount(previous, 9), 0);
+	assert.equal(previousWorkCount({ total_plays: 0, items: [] }, 7), 0);
+	const cut = { items: Array.from({ length: WORKS_LIMIT }, (_, i) => ({ id: 100 + i, count: 1 })) };
+	assert.equal(previousWorkCount(cut, 100), 1);
+	assert.equal(previousWorkCount(cut, 7), null);
+});
+
+test('with the previous 학기, the works table and CSV add 지난 학기, matched by id', () => {
+	const composer = { id: 1, name: 'C' };
+	// 이름이 같은 두 곡(id 2, 3): 지난 학기 칸은 id 로 맞춘다.
+	const works = {
+		items: [
+			{ id: 1, name: 'C - 가', count: 1500, composer_id: 1, first_played: '2025-03-04' },
+			{ id: 2, name: 'C - 나', count: 9, composer_id: 1 },
+			{ id: 3, name: 'C - 나', count: 9, composer_id: 1 },
+			{ id: 4, name: 'C - 라', count: 2, composer_id: 1 }
+		]
+	};
+	const previous = {
+		total_plays: 1240,
+		items: [
+			{ id: 1, name: 'C - 가', count: 1234 },
+			{ id: 3, name: 'C - 나', count: 6 }
+		]
+	};
+	const table = composerWorksTable(works, composer, previous);
+	assert.deepEqual(
+		table.columns.map((c) => c.name),
+		['순위', '곡', '횟수', '처음', '마지막', '지난 학기']
+	);
+	// 처음·마지막처럼 수치 칸이라 한 줄로 둔다.
+	assert.equal(table.columns[5].numeric, true);
+	assert.equal(table.rowHeader, 1);
+	assert.deepEqual(table.rows, [
+		['1', '가', '1,500', '2025-03-04', '—', '1,234'],
+		['2', '나', '9', '—', '—', '0'],
+		['2', '나', '9', '—', '—', '6'],
+		['4', '라', '2', '—', '—', '0']
+	]);
+	const csv = composerWorksCsv(works, composer, previous);
+	assert.deepEqual(csv.headers, ['곡', '횟수', '처음', '마지막', '지난 학기']);
+	assert.deepEqual(csv.rows, [
+		['가', 1500, '2025-03-04', '', 1234],
+		['나', 9, '', '', 0],
+		['나', 9, '', '', 6],
+		['라', 2, '', '', 0]
+	]);
+	assert.equal(
+		toCsvTable(csv.headers, csv.rows),
+		'곡,횟수,처음,마지막,지난 학기\n가,1500,2025-03-04,,1234\n나,9,,,0\n나,9,,,6\n라,2,,,0'
+	);
+
+	// 앞 학기에 선곡이 없으면 모두 0.
+	const none = { total_plays: 0, items: [] };
+	assert.deepEqual(
+		composerWorksTable(works, composer, none).rows.map((row) => row[5]),
+		['0', '0', '0', '0']
+	);
+	assert.deepEqual(
+		composerWorksCsv(works, composer, none).rows.map((row) => row[4]),
+		[0, 0, 0, 0]
+	);
+
+	// 앞 학기 목록이 WORKS_LIMIT 에서 잘렸으면, 거기 없는 곡은 알 수 없다: 표는 '—', CSV 는 빈칸.
+	const cut = {
+		total_plays: 5000,
+		items: Array.from({ length: WORKS_LIMIT }, (_, i) => ({ id: i === 0 ? 1 : 100 + i, count: 1 }))
+	};
+	assert.deepEqual(
+		composerWorksTable(works, composer, cut).rows.map((row) => row[5]),
+		['1', '—', '—', '—']
+	);
+	assert.deepEqual(
+		composerWorksCsv(works, composer, cut).rows.map((row) => row[4]),
+		[1, '', '', '']
+	);
+
+	// 앞 학기가 없으면(null) 칸을 두지 않는다.
+	assert.deepEqual(composerWorksTable(works, composer, null), composerWorksTable(works, composer));
+	assert.equal(composerWorksTable(works, composer).columns.length, 5);
+	assert.deepEqual(composerWorksCsv(works, composer, null), composerWorksCsv(works, composer));
+	assert.deepEqual(composerWorksCsv(works, composer).headers, ['곡', '횟수', '처음', '마지막']);
 });
 
 test('composerSemesterLinks opens each 학기 of 학기별 선곡 with this composer', () => {

@@ -200,10 +200,12 @@
 	// 기간이 목록의 학기면 총 선곡·타임·곡 칸 아래에 바로 앞 학기와 견준 줄을 둔다(통계와 같다).
 	// 앞 학기의 요약은 같은 작곡가·지기·견습 포함으로 카드와 함께 부르고, 실패하면 줄만 없다.
 	// 많이 튼 독주자·지휘자 표에는 앞 학기 같은 길이의 목록에서의 순위를 붙인다(통계와 같다).
+	// 많이 튼 곡 표에는 앞 학기에 튼 횟수를 붙인다(같은 WORKS_LIMIT 의 목록).
 	// 실패하면 그 표만 지금과 같다.
 	let previousSummary = null;
 	/** @type {Record<string, any>} 앞 학기의 독주자·지휘자 목록(LIMITS 의 키) */
 	let previousRanks = {};
+	let previousWorks = null; // 앞 학기의 곡 목록
 	let previousAsked = null; // 마지막으로 부른 앞 학기 id(없으면 null)
 	let previousGeneration = 0;
 	const previousOf = (p, list) => {
@@ -217,6 +219,7 @@
 		previousAsked = previous?.id ?? null;
 		previousSummary = null;
 		previousRanks = {};
+		previousWorks = null;
 		if (!previous || !id) return;
 		const ask = async (endpoint, apply, extra = {}) => {
 			try {
@@ -230,6 +233,7 @@
 		};
 		await Promise.allSettled([
 			ask('summary', (result) => (previousSummary = result)),
+			ask('works', (result) => (previousWorks = result), { limit: String(WORKS_LIMIT) }),
 			...Object.entries(LIMITS).map(([key, limit]) =>
 				ask(key, (result) => (previousRanks = { ...previousRanks, [key]: result }), {
 					limit: String(limit)
@@ -300,12 +304,13 @@
 	$: conductorTable =
 		conductors &&
 		rankChangeTable(conductors, previousRanks.conductors, '지휘자', LIMITS.conductors);
-	$: worksTable = works && works.items.length > 0 && composerWorksTable(works, composer);
+	$: worksTable =
+		works && works.items.length > 0 && composerWorksTable(works, composer, previousWorks);
 	// 많이 튼 곡의 CSV 저장: 차트 카드(ChartCard)처럼, 표가 보일 때만 그 곡들을 받는다.
 	$: canExportWorks = Boolean(worksTable) && !loading.works && !errors.works;
 	function exportWorksCsv() {
 		if (!canExportWorks) return;
-		const csv = composerWorksCsv(works, composer);
+		const csv = composerWorksCsv(works, composer, previousWorks);
 		downloadCsvTable(
 			downloadName(['통계', '많이 튼 곡', fileTag, todayStamp()], 'csv'),
 			csv.headers,
