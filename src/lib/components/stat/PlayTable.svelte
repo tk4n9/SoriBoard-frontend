@@ -1,8 +1,15 @@
 <script>
-	import { sessionText, workText, workParts, performersText, jigiNames } from '$lib/playHistory.js';
+	import {
+		sessionText,
+		workText,
+		workParts,
+		performersText,
+		recordingParts,
+		jigiNames
+	} from '$lib/playHistory.js';
 	import { composerHref } from '$lib/composerStats.js';
 
-	// 선곡 기록의 결과 표. 날짜·타임은 그 타임 화면으로, 작곡가는 그 작곡가 페이지로 가는 링크다.
+	// 선곡 기록의 결과 표. 음반 칸은 음반 번호 아래에 음원 종류를 작게 둔다. 날짜·타임은 그 타임 화면으로, 작곡가는 그 작곡가 페이지로 가는 링크다.
 	/** @type {import('$lib/playHistory.js').Play[]} */
 	export let rows = [];
 	export let label = '선곡 기록';
@@ -18,6 +25,7 @@
 			<th scope="col">날짜·타임</th>
 			<th scope="col">곡</th>
 			<th scope="col">연주</th>
+			<th scope="col" class="narrow">음반</th>
 			<th scope="col">지기</th>
 			<th scope="col" class="narrow">신청곡</th>
 		</tr>
@@ -25,6 +33,7 @@
 	<tbody>
 		{#each rows as play (play.id)}
 			{@const work = workParts(play)}
+			{@const recording = recordingParts(play)}
 			<tr>
 				<th scope="row" class="session">
 					<a href={`/time_manage/${play.time_id}`} title="이 타임 열기">{sessionText(play)}</a>
@@ -46,6 +55,10 @@
 					{/if}
 				</td>
 				<td>{performersText(play)}</td>
+				<td>
+					{#if recording.number}<div class="recording">{recording.number}</div>{/if}
+					{#if recording.source}<div class="semi recording">{recording.source}</div>{/if}
+				</td>
 				<td>
 					{#each jigiNames(play) as name, i}{#if i}{', '}{/if}<span class="jigi">{name}</span
 						>{/each}
@@ -106,6 +119,10 @@
 	}
 	.missing {
 		color: var(--gray-gray-500, #9f9f9f);
+	}
+	/* 음반 번호·음원 종류(각 20자 이내)는 한 줄로 */
+	.recording {
+		white-space: nowrap;
 	}
 	/* 이름은 글자 사이에서 끊지 않고, 여러 지기면 이름 사이에서만 줄을 바꾼다 */
 	.jigi {
