@@ -22,6 +22,7 @@
 	} from '$lib/statPeriod.js';
 	import { semesterRangeOf, timelineBucketName, timelineView } from '$lib/statBucket.js';
 	import { previousSemester, kpiChangeText, rankChangeTable } from '$lib/semesterReport.js';
+	import { catalogHref } from '$lib/composerCatalog.js';
 	import {
 		readComposerId,
 		readComposerPeriod,
@@ -396,6 +397,14 @@
 			<a class="page-link" href={composerStatHref(filter)}>통계</a>
 			{#if composerId && !notFound}
 				<a class="page-link" href={historyLink}>선곡 기록</a>
+			{/if}
+			<!-- 이름으로 검색한 작곡가 정리: 시대·출생 연도를 고치는 곳 -->
+			{#if composer}
+				<a
+					class="page-link"
+					href={catalogHref(composer.name)}
+					title="작곡가 정리에서 이 작곡가의 시대·출생 연도 고치기">작곡가 정리</a
+				>
 			{/if}
 		</div>
 		{#if composerId && !notFound}
