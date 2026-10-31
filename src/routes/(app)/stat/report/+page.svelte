@@ -48,7 +48,8 @@
 		return res.json();
 	};
 	// 요약·상위 10·시대·장르는 지난 학기와 견준다(지난 학기가 없으면 previous 는 null).
-	// 지난 학기만 실패하면 이 학기만으로 그린다(semesterReport.js).
+	// 지난 학기만 실패하면 이 학기만으로 그리고, KPI 칸 아래 줄(previousFailed)이 그렇다고 알린다.
+	// 그 줄의 '다시 시도'(retryPrevious)는 실패한 카드의 지난 학기 쪽만 다시 부른다.
 	const withPrevious = async (endpoint, extra = {}) => {
 		const before = previous;
 		const pair = await loadWithPrevious(
@@ -60,17 +61,24 @@
 		}
 		return pair;
 	};
-	const cardRequests = {
-		summary: () => withPrevious('summary'),
-		composers: () => withPrevious('composers', { limit: '10' }),
-		soloists: () => withPrevious('soloists', { limit: '10' }),
-		works: () => withPrevious('works', { limit: '10' }),
-		conductors: () => withPrevious('conductors', { limit: '10' }),
-		orchestras: () => withPrevious('orchestras', { limit: '10' }),
-		eras: () => withPrevious('eras'),
-		genres: () => withPrevious('genres'),
+	// 지난 학기와 견주는 카드의 요청: [엔드포인트, 덧붙일 인자].
+	/** @type {Record<string, [string, Record<string, string>?]>} */
+	const compared = {
+		summary: ['summary'],
+		composers: ['composers', { limit: '10' }],
+		soloists: ['soloists', { limit: '10' }],
+		works: ['works', { limit: '10' }],
+		conductors: ['conductors', { limit: '10' }],
+		orchestras: ['orchestras', { limit: '10' }],
+		eras: ['eras'],
+		genres: ['genres'],
 		// 선곡 다양성은 summary 만 쓴다. 월별 버킷이면 쓰지 않는 timeline 이 작다.
-		diversity: () => withPrevious('diversity', { bucket: 'month' }),
+		diversity: ['diversity', { bucket: 'month' }]
+	};
+	const cardRequests = {
+		...Object.fromEntries(
+			Object.keys(compared).map((key) => [key, () => withPrevious(...compared[key])])
+		),
 		firstComposers: () => getJson('firsts', semester.id, { kind: 'composer' }),
 		firstWorks: () => getJson('firsts', semester.id, { kind: 'work' })
 	};
@@ -131,6 +139,34 @@
 		loading[key] = true;
 		errors[key] = '';
 		loadCard(key, generation);
+	}
+
+	// 지난 학기 쪽만 실패한 카드(학기를 바꾸면 data 와 함께 비워진다). 다시 부르는 동안은 줄에서 뺀다.
+	$: previousFailed = Object.keys(compared).filter(
+		(key) => data[key]?.previousError && !data[key].retryingPrevious
+	);
+	// 지난 학기 수치의 '다시 시도': 실패한 카드의 지난 학기만 다시 부르고, 이 학기의 표는 그대로 둔다.
+	// 그 사이 학기를 바꾸거나 카드의 '다시 시도'가 새 짝(current)을 받았으면 늦은 응답은 버린다.
+	// 부르는 동안 previousError 는 두어, 분포 카드의 부제가 '지난 학기 없음'으로 바뀌지 않게 한다.
+	function retryPrevious() {
+		kpiRow?.focus();
+		for (const key of previousFailed) {
+			const gen = generation;
+			const before = previous;
+			const { current } = data[key];
+			const [endpoint, extra] = compared[key];
+			const still = () => gen === generation && data[key]?.current === current;
+			data[key] = { ...data[key], retryingPrevious: true };
+			getJson(endpoint, before.id, extra)
+				.then((result) => {
+					if (still()) data[key] = { current, previous: result, previousError: null };
+				})
+				.catch((e) => {
+					if (!still()) return;
+					console.error(`학기 결산 지난 학기 로딩 실패 (${endpoint})`, e);
+					data[key] = { current, previous: null, previousError: e };
+				});
+		}
 	}
 
 	function choose(next) {
@@ -441,6 +477,15 @@
 					on:click={(e) => retry('summary', e, kpiRow)}
 					aria-label="요약 다시 시도"
 				>
+					다시 시도
+				</button>
+			</p>
+		{/if}
+		<!-- 인쇄에서도 문장은 남고(비교가 빠졌다는 것), 단추만 숨는다 -->
+		{#if previousFailed.length && previousLabel}
+			<p class="kpi-error">
+				지난 학기({previousLabel})와 견준 수치를 불러오지 못했습니다.
+				<button class="tool-btn" on:click={retryPrevious} aria-label="지난 학기 수치 다시 시도">
 					다시 시도
 				</button>
 			</p>
