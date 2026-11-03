@@ -40,7 +40,9 @@
 		writeDiversityBucket,
 		semesterRangeOf,
 		semesterOf,
-		semesterBefore
+		semesterBefore,
+		bucketRange,
+		sameSpanBefore
 	} from '$lib/statBucket.js';
 	import {
 		shareTable,
@@ -136,10 +138,12 @@
 	// 백엔드가 적용했다고 돌려준 기간(filters). 기간이 바뀔 때만 비운다.
 	let appliedFilters = null;
 
-	// 현재 필터를 쿼리스트링으로.
-	function buildQuery(extra = {}) {
+	// 현재 필터를 쿼리스트링으로. periodParams 를 주면 보기의 기간 대신 그것을 보낸다(앞 학기 요청).
+	function buildQuery(extra = {}, periodParams = null) {
 		const params = new URLSearchParams();
-		if (period === CURRENT) {
+		if (periodParams) {
+			for (const [k, v] of Object.entries(periodParams)) params.set(k, v);
+		} else if (period === CURRENT) {
 			if (startDate) params.set('start', startDate);
 			if (endDate) params.set('end', endDate);
 		} else if (period === CUSTOM) {
@@ -157,8 +161,8 @@
 		return s ? `?${s}` : '';
 	}
 
-	async function getJson(endpoint, extra) {
-		const res = await fetch(`/api/stats/${endpoint}${buildQuery(extra)}`);
+	async function getJson(endpoint, extra, periodParams = null) {
+		const res = await fetch(`/api/stats/${endpoint}${buildQuery(extra, periodParams)}`);
 		if (!res.ok) throw new Error(`${endpoint} 실패`);
 		return res.json();
 	}
@@ -300,6 +304,20 @@
 		const chosen = list.find((s) => String(s.id) === p);
 		return chosen ? previousSemester(chosen, list) : null;
 	};
+	// 진행 중인 학기(이번 학기, 또는 오늘이 든 학기)는 앞 학기도 첫날부터 같은 날수만큼만 센다
+	// (statBucket.js). 지난 학기를 고르면 null: 앞 학기 전체(semester_id)와 견준다.
+	let previousSpan = null; // 마지막으로 부른 앞 학기의 같은 기간({ start, end }, 없으면 null)
+	const previousSpanOf = (p, list) => {
+		const previous = previousOf(p, list);
+		if (!previous) return null;
+		const range = bucketRange('semester', `${previous.year}-${previous.semester_num}`);
+		if (p === CURRENT) return sameSpanBefore(range, startDate, endDate);
+		const own = semesterRangeOf(p, list);
+		return ongoingText(own, endDate) ? sameSpanBefore(range, own.start, endDate) : null;
+	};
+	// 앞 학기 요청의 기간: 같은 기간이 있으면 그 날짜, 없으면 앞 학기 전체.
+	const previousParams = (span, previous) =>
+		span ? { start: span.start, end: span.end } : { semester_id: String(previous.id) };
 	// 앞 학기의 장르도 지금 학기의 카드처럼 다양성 응답에서 꺼낸다(요청 하나, stats/genres 와 같은 수). 월별 버킷이면 쓰지 않는 timeline 이 작다.
 	const previousRequests = {
 		summary: { apply: (result) => (previousSummary = result) },
@@ -336,8 +354,8 @@
 		// 기록이 endpoint 를 밝히면 그것을 부른다(키가 같은 엔드포인트를 둘이 나눠 쓸 때).
 		const { apply, extra = {}, endpoint: path = endpoint } = previousRequests[endpoint];
 		try {
-			// buildQuery 는 extra 를 마지막에 넣으므로 기간의 semester_id 만 바뀌고 지기는 그대로다.
-			const result = await getJson(path, { ...extra, semester_id: String(previousTarget.id) });
+			// 보기의 기간 대신 앞 학기의 기간(같은 기간 또는 semester_id)만 보내고, 지기는 그대로다.
+			const result = await getJson(path, extra, previousParams(previousSpan, previousTarget));
 			if (requests.isLatest('previousSummary', id)) apply(result);
 		} catch (e) {
 			if (requests.isLatest('previousSummary', id)) {
@@ -351,6 +369,7 @@
 		const previous = previousOf(period, semesters);
 		previousAsked = previous?.id ?? null;
 		previousTarget = previous;
+		previousSpan = previousSpanOf(period, semesters);
 		previousFailed = [];
 		previousSummary = null;
 		previousEras = null;
@@ -421,11 +440,12 @@
 		previousDrillFailed = false;
 		if (!drill || !previous || (scope === 'individual' && !userId)) return;
 		try {
-			// buildQuery 는 extra 를 마지막에 넣으므로 기간의 semester_id 만 바뀌고 지기는 그대로다.
-			const result = await getJson('works', {
-				...drillParams(drill),
-				semester_id: String(previous.id)
-			});
+			// 요약과 같은 앞 학기의 기간(같은 기간 또는 semester_id)만 보내고, 지기는 그대로다.
+			const result = await getJson(
+				'works',
+				drillParams(drill),
+				previousParams(previousSpanOf(period, semesters), previous)
+			);
 			if (requests.isLatest('previousDrill', id)) previousDrillWorks = result;
 		} catch (e) {
 			if (requests.isLatest('previousDrill', id)) {
@@ -938,11 +958,18 @@
 				</button>
 			</p>
 		{/if}
-		<!-- 진행 중인 학기를 학기 전체인 앞 학기와 견주면 모든 칸이 줄어 보이므로 그렇다고 적는다(학기 결산과 같은 말).
+		<!-- 진행 중인 학기는 앞 학기도 같은 시점까지만 세므로(previousSpan) 그 날짜를 적는다. 날짜를 못 셌으면
+		     앞 학기 전체와 견주므로 그렇다고 적는다(학기 결산과 같은 말).
 		     이번 학기는 늘 오늘까지라 진행 중이다(머리말의 '진행 중' 칸은 학기를 고를 때만 보인다). -->
 		{#if (ongoing || period === CURRENT) && previousTarget}
 			<p class="kpi-note">
-				진행 중인 학기입니다. 지난 학기({semesterLabel(previousTarget)}) 수치는 학기 전체입니다.
+				{#if previousSpan}
+					진행 중인 학기입니다. 지난 학기({semesterLabel(previousTarget)})는 같은 시점까지({periodRangeText(
+						previousSpan
+					)}) 셌습니다.
+				{:else}
+					진행 중인 학기입니다. 지난 학기({semesterLabel(previousTarget)}) 수치는 학기 전체입니다.
+				{/if}
 			</p>
 		{/if}
 
