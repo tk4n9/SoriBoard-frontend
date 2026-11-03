@@ -2,7 +2,7 @@
 // stats/timeline 과 diversity 는 같은 선곡을 같은 주·월 라벨로 센다.
 // 범위가 한 학기를 넘으면 학기별, 한 학기 이하면 주별/월별 토글이 보이지 않는 쪽(주별 ↔ 월별).
 
-import { ALL, CURRENT, CUSTOM } from './statPeriod.js';
+import { ALL, CURRENT, CUSTOM, isIsoDate } from './statPeriod.js';
 
 // 날짜(YYYY-MM-DD)가 속한 학기 'YYYY-N'. 백엔드의 학기 버킷과 같은 규칙:
 // 3~8월 = 그해 1학기, 9~12월 = 그해 2학기, 1~2월 = 전해 2학기.
@@ -150,6 +150,25 @@ export function semesterRangeOf(id, semesters) {
 	if (!Array.isArray(semesters)) return null;
 	const found = semesters.find((s) => String(s.id) === id);
 	return found ? bucketRange('semester', `${found.year}-${found.semester_num}`) : null;
+}
+
+// 진행 중인 학기(start 부터 today 까지)와 견줄 앞 학기의 같은 기간: 앞 학기 첫날부터 같은 날수만큼
+// (앞 학기 끝을 넘지 않는다). 예: 2026-09-01 ~ 2026-11-03(63일) → 2026-03-01 ~ 2026-05-03.
+// previous 가 없거나 날짜가 비었거나 틀렸거나 today 가 start 전이면 null.
+/**
+ * @param {{ start: string, end: string } | null | undefined} previous 앞 학기의 범위(bucketRange)
+ * @param {string} start 진행 중인 학기의 첫날(YYYY-MM-DD)
+ * @param {string} today YYYY-MM-DD
+ * @returns {{ start: string, end: string } | null}
+ */
+export function sameSpanBefore(previous, start, today) {
+	if (!previous || ![previous.start, previous.end, start, today].every(isIsoDate)) return null;
+	if (today < start) return null;
+	/** @param {string} date */
+	const utc = (date) =>
+		Date.UTC(Number(date.slice(0, 4)), Number(date.slice(5, 7)) - 1, Number(date.slice(8, 10)));
+	const end = isoDate(new Date(utc(previous.start) + (utc(today) - utc(start))));
+	return { start: previous.start, end: end < previous.end ? end : previous.end };
 }
 
 // 범위를 응답이 적용한 기간(filters.start·end, 없으면 그쪽이 열림) 안으로 줄인다.

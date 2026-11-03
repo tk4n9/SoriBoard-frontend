@@ -12,7 +12,8 @@ import {
 	clipRange,
 	semesterIdOf,
 	semesterRangeOf,
-	semesterBefore
+	semesterBefore,
+	sameSpanBefore
 } from '../../src/lib/statBucket.js';
 
 const TODAY = '2026-10-26';
@@ -319,4 +320,54 @@ test('semesterBefore: no older 학기, no list or a bad label gives null', () =>
 	assert.equal(semesterBefore('2026-3', LISTED), null);
 	assert.equal(semesterBefore('2026-09-01', LISTED), null);
 	assert.equal(semesterBefore('', LISTED), null);
+});
+
+test('sameSpanBefore: a running 2학기 compares with 1학기 up to the same number of days', () => {
+	// 2026-09-01 → 2026-11-03 is 63 days; 2026-03-01 + 63 days = 2026-05-03.
+	assert.deepEqual(sameSpanBefore(bucketRange('semester', '2026-1'), '2026-09-01', '2026-11-03'), {
+		start: '2026-03-01',
+		end: '2026-05-03'
+	});
+	// 2026-03-01 → 2026-04-10 is 40 days; 2025-09-01 + 40 days = 2025-10-11.
+	assert.deepEqual(sameSpanBefore(bucketRange('semester', '2025-2'), '2026-03-01', '2026-04-10'), {
+		start: '2025-09-01',
+		end: '2025-10-11'
+	});
+});
+
+test('sameSpanBefore: on the first day, only the previous 학기’s first day', () => {
+	assert.deepEqual(sameSpanBefore(bucketRange('semester', '2026-1'), '2026-09-01', '2026-09-01'), {
+		start: '2026-03-01',
+		end: '2026-03-01'
+	});
+});
+
+test('sameSpanBefore: a running 학기 longer than the previous one stops at its end', () => {
+	assert.deepEqual(sameSpanBefore(bucketRange('semester', '2027-2'), '2028-03-01', '2028-08-31'), {
+		start: '2027-09-01',
+		end: '2028-02-29'
+	});
+	assert.deepEqual(sameSpanBefore(bucketRange('semester', '2026-2'), '2027-03-01', '2027-08-31'), {
+		start: '2026-09-01',
+		end: '2027-02-28'
+	});
+});
+
+test('sameSpanBefore: a span across a year end', () => {
+	// 2026-09-01 → 2027-01-15 is 136 days; 2026-03-01 + 136 days = 2026-07-15.
+	assert.deepEqual(sameSpanBefore(bucketRange('semester', '2026-1'), '2026-09-01', '2027-01-15'), {
+		start: '2026-03-01',
+		end: '2026-07-15'
+	});
+});
+
+test('sameSpanBefore: null without a previous 학기, before the start, or for a malformed date', () => {
+	const previous = bucketRange('semester', '2026-1');
+	assert.equal(sameSpanBefore(null, '2026-09-01', '2026-11-03'), null);
+	assert.equal(sameSpanBefore(previous, '2026-09-01', '2026-08-31'), null);
+	assert.equal(sameSpanBefore(previous, '', '2026-11-03'), null);
+	assert.equal(sameSpanBefore(previous, '2026-09-01', ''), null);
+	assert.equal(sameSpanBefore(previous, '2026-13-01', '2026-11-03'), null);
+	assert.equal(sameSpanBefore(previous, '2026-9-1', '2026-11-03'), null);
+	assert.equal(sameSpanBefore({ start: '2026-03-01', end: '' }, '2026-09-01', '2026-11-03'), null);
 });
